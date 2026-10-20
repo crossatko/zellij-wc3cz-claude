@@ -133,7 +133,7 @@ case "$1" in end|notify|ask|clear) ;; *) : >"$f.ev" ;; esac
 case "$1" in
   tool)    # optional PreToolUse/PostToolUse hook: a turn that started without UserPromptSubmit (the main
            # agent woken by a finished subagent) is working
-           # AskUserQuestion / ExitPlanMode wait for the owner: attention. Any other tool call of the asker
+           # AskUserQuestion / ExitPlanMode wait for the user: attention. Any other tool call of the asker
            # means the question was answered (a denied permission fires no hook of its own).
            case "$(json_str tool_name "$2")" in
              AskUserQuestion|ExitPlanMode) attn_raise "$@"; ( run_timeout 3 zellij pipe --name claude_poke -- "" </dev/null >/dev/null 2>&1 & ) 2>/dev/null; exit 0 ;;

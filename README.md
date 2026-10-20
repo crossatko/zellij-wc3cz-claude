@@ -8,7 +8,7 @@ zellij 0.45.1) with extras for running Claude Code agents in tabs:
   when an agent finished in a tab you have not looked at yet.
 - **Characters**: every Claude tab gets one Warcraft III character (92 with Czech voice lines, e.g.
   Arthas Menethill, Thrall, Illidan; unique up to 92 tabs), shown as the character's portrait icon
-  (colour icon font, kitty on Linux) or the race's unicode symbol. The whole tab is tinted in the
+  (colour icon font, Linux with fontconfig) or a two-letter initials badge (any terminal). The whole tab is tinted in the
   character's colour: the race colour (human gold, orc green, undead purple, nightelf teal, naga
   blue, demon red, neutral grey) shifted a little per character, so neighbours differ but the race
   stays recognisable.
@@ -45,8 +45,13 @@ All scripts find each other relative to their own location, so the checkout can 
 - zellij 0.45.x, Claude Code with plugin support, a POSIX shell, `find`, `od`, `awk`, `sed`.
 - An audio player: `pw-play` (PipeWire) or `paplay`, `ffplay`, `aplay` on Linux; `afplay` on macOS
   (built in). Autodetected.
-- Optional: fontconfig on Linux for the colour icons (`fontconfig/install.sh`); `jq` only for
-  `setup.sh --migrate-to-plugin` / legacy options; Rust with the `wasm32-wasip1` target only to rebuild.
+- Optional: fontconfig on Linux for the colour icons (`fontconfig/install.sh`; the plugin detects the font
+  with `fc-list`, without it the bar shows initials badges); `ss` (iproute2, Linux) and a desktop helper for
+  the OS-focus check (see "Away from the terminal"; `jq` for Sway; macOS needs `perl` or `timeout` from
+  coreutils); `jq` for `setup.sh --migrate-to-plugin` / legacy options and the hook status; Rust with the
+  `wasm32-wasip1` target only to rebuild.
+- Disk: the voice line library is about 135 MB. A git clone holds it once; `claude plugin install` keeps
+  one more cached copy of the repo per version, so plan for roughly twice that.
 
 ## Quick start (no config edits)
 
@@ -89,6 +94,9 @@ Nothing in your existing config files has to change. Two steps:
    Pressing `n` leaves the bar showing "permissions denied"; a new session asks again. To skip the
    prompt, pre-grant instead: `sh ~/.claude/plugins/marketplaces/zellij-wc3cz/setup.sh --permissions`.
 
+The marketplace clone is only refreshed by `claude plugin marketplace update zellij-wc3cz`: until then the
+wasm the layout loads can lag behind the hooks of a newer plugin version.
+
 That is all: voice lines, agent counts and attention markers work once a `claude` in that session has
 run a hook (the hook tells the plugin where the package is). Plugin options go into the `plugin` block
 of the layout (see Options), e.g. `plugin location="file:..." { ding_when_focused false; }`.
@@ -102,25 +110,45 @@ sh ~/.claude/plugins/marketplaces/zellij-wc3cz/fontconfig/install.sh            
 
 It writes two files that belong to this package (`~/.local/share/fonts/wc3-icons.ttf` and
 `~/.config/fontconfig/conf.d/60-wc3-icons.conf`) and runs `fc-cache`; it edits no terminal config.
-The rules make fontconfig use "WC3 Icons" for exactly the font's own codepoints (U+1F7E0..U+1F7E6 and
-U+1FA70..U+1FAD6 minus gaps), ahead of other emoji fonts; every other emoji and all text are unchanged.
-Side effect: in every app that uses fontconfig those few emoji (coloured circles, ballet shoes, ringed
-planet, chair, hamsa, ...) show WC3 portraits. Per terminal:
+The rules make fontconfig use "WC3 Icons" for the font's character icon codepoints (U+1FA70..U+1FAD6 minus
+gaps, one per character), ahead of other emoji fonts; every other emoji and all text are unchanged. The
+seven race fallback codepoints U+1F7E0..U+1F7E6 (the orange to brown circle emoji) are NOT overridden, so
+the usual status-dot emoji keep their look; a character without an icon in the font then shows the system
+circle emoji where the race glyph would be. Side effect: in every app that uses fontconfig the few emoji
+at the character codepoints (ballet shoes, ringed planet, chair, hamsa, ...) show WC3 portraits.
+Verified only through `fc-match` and kitty's own fontconfig query (not in a running terminal window of
+every kind). Per terminal:
 
 | Terminal | Colour icons after `fontconfig/install.sh` |
 |----------|--------------------------------------------|
-| kitty | yes, through its fontconfig fallback (restart kitty); a `symbol_map ... WC3 Icons` line is no longer needed but harmless |
-| alacritty, foot, other fontconfig terminals | through the fallback rules; alacritty may need a vertical offset (see `assets/wc3-icons/README.md`) |
-| ghostty | no: it ignores fontconfig for emoji; add `font-codepoint-map = U+1F7E0-U+1F7E6=WC3 Icons` and `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons` to its config yourself |
+| kitty | expected to work through its per-character fontconfig fallback (restart kitty); the kitty fontconfig query was checked with `fc-match`; a `symbol_map ... WC3 Icons` line is not needed but harmless |
+| alacritty | needs an extra fontconfig family rule of your own (append `WC3 Icons` to your terminal font's family; `fontconfig/install.sh` prints an example) and probably `font.offset.y`, see `assets/wc3-icons/README.md`; not tested here |
+| wezterm, foot, konsole | untested |
+| ghostty | no: it ignores fontconfig for emoji; add `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons` to its config yourself |
 | macOS terminals | not supported (CoreText draws no CBDT bitmaps): initials badges |
 
 A terminal that cannot draw colour bitmap fonts shows another emoji or a box instead: set
-`race_font "false"` in the plugin block (plain symbols) or run `fontconfig/install.sh --uninstall`.
+`race_font "false"` in the plugin block (initials badges) or run `fontconfig/install.sh --uninstall`.
 
 macOS: the same two steps. Sounds play through `afplay` (FLAC needs macOS 10.13+).
 
-To go back to the stock bar: start zellij without the layout (or `default_layout "compact"`), and
-`claude plugin uninstall zellij-wc3cz@zellij-wc3cz`.
+## Uninstall
+
+1. Bar: start zellij without the layout (or `default_layout "compact"`) and remove the pane from your own
+   layouts.
+2. Hooks: `claude plugin uninstall zellij-wc3cz@zellij-wc3cz`, then `claude plugin marketplace remove
+   zellij-wc3cz` (run both once per Claude config dir you installed it in). Hooks that an older `setup.sh`
+   wrote into `settings.json`: `sh <pkg>/setup.sh --migrate-to-plugin` (before deleting the checkout).
+3. Icon font: `sh <pkg>/fontconfig/install.sh --uninstall` (or `setup.sh --font-uninstall`) removes
+   `~/.local/share/fonts/wc3-icons.ttf` and `~/.config/fontconfig/conf.d/60-wc3-icons.conf`. While the font
+   is installed it also answers for the emoji at the character codepoints in every fontconfig app.
+4. zellij permission grant (only if you answered `y` or ran `setup.sh --permissions`): delete the block whose
+   header is the path of `claude-tabs.wasm` from zellij's `permissions.kdl` (Linux
+   `${XDG_CACHE_HOME:-~/.cache}/zellij/permissions.kdl`, macOS
+   `~/Library/Caches/org.Zellij-Contributors.Zellij/permissions.kdl`).
+5. Runtime state: `rm -r /tmp/zellij-$(id -u)/zellij-claude` (macOS: under `$TMPDIR`); it is recreated
+   by the next hook event.
+6. A git checkout can then be deleted; the plugin cache `~/.claude/plugins/` is cleaned by the commands in 2.
 
 ## Install from a git checkout (development, advanced)
 
@@ -141,12 +169,14 @@ own option:
 
 - `--font` / `--font-uninstall`: `fontconfig/install.sh` (Linux).
 - `--permissions`: pre-grant the plugin permissions in zellij's `permissions.kdl` for this checkout's
-  wasm path (zellij keys grants by the exact `~`-expanded path, symlinks not resolved).
+  wasm path (zellij keys grants by the exact `~`-expanded path, symlinks not resolved); the file is
+  rewritten atomically and keeps its other content.
 - `--build`: rebuild `claude-tabs.wasm` (else the tracked prebuilt one is used).
 - `--migrate-to-plugin`: for users of an older setup.sh that wrote the hooks into `settings.json`:
   removes exactly those `claude-hook.sh <event>` entries (other hooks and keys stay; backup
-  `<file>.bak-claude-tabs`; idempotent). Without it the plugin and the old entries both fire and every
-  hook runs twice. Targets: `--settings FILE` (repeatable), `--all-claude-dirs` (every `~/.claude*/`
+  `<file>.bak-claude-tabs`; idempotent). Without it the plugin's hooks and the old entries both run.
+  The script drops the duplicate event, but that doubles process spawns and relies on a marker file, so
+  keep one route. Targets: `--settings FILE` (repeatable), `--all-claude-dirs` (every `~/.claude*/`
   dir), default `$CLAUDE_CONFIG_DIR/settings.json`, else `~/.claude/settings.json`.
 - Legacy, not recommended: `--legacy-settings-hooks` (write the hooks into `settings.json` instead of
   using the plugin; old name `--hooks`), `--link` (the old `~/.config/zellij/plugins/claude-tabs` link
@@ -181,8 +211,10 @@ until the question is answered. One ding per request; options `attention` (defau
 
 Legacy (`setup.sh --legacy-settings-hooks`) writes the same events into `settings.json` as
 `{ "hooks": { "Stop": [ { "hooks": [ { "type": "command", "command": "<pkg>/claude-hook.sh done" } ] } ] } }`.
-Never use both: Claude Code runs a plugin's hook and an identical settings hook separately, so every
-event would arrive twice (`setup.sh` without options reports this; `--migrate-to-plugin` fixes it).
+Use one route, not both: Claude Code runs a plugin's hook and an identical settings hook separately, so
+both copies run for every event. `claude-hook.sh` drops the duplicate (a marker per event and payload), but
+this doubles process spawns and depends on that marker, so migrate (`setup.sh` without options reports
+a double registration; `--migrate-to-plugin` fixes it).
 
 The hook is a silent no-op outside zellij. It does not care which Claude config dir a session uses:
 the transcript location comes from the hook payload (`transcript_path`). Without hooks a pane still counts as Claude when its
@@ -221,14 +253,17 @@ as focused. Sandboxed terminals (flatpak) do not match by pid; the title rule st
 
 ## Options
 
-Set in the `claude-tabs` block of your zellij `config.kdl`. All values are strings or bare true/false; they are
-read when the session starts (restart the session after a change; a plugin reload only picks up new
-code).
+Set in the `plugin` block of your layout (`plugin location="file:..." { ding_when_focused false; }`), or in
+a `claude-tabs` alias block of `config.kdl` if you load the plugin through such an alias. All values are
+strings or bare true/false (`true/1/yes/on`, `false/0/no/off`); they are read when the session starts
+(restart the session after a change; a plugin reload only picks up new code).
 
 | Option | Default | Meaning |
 |--------|---------|---------|
 | `package_dir` | (empty) = found automatically | the package dir (scripts + `sounds/`). Empty: the dir `claude-hook.sh` runs from, which it reports to the plugin on every event (`<zellij tmp>/zellij-claude/pkgdir`; works from the Claude Code plugin cache, a checkout or a link); before the first hook event `~/.config/zellij/plugins/claude-tabs`. Set it only to force another location |
-| `ding_command` | `play-phrase.sh --ding` | fallback sound when there is no voice line to play (empty library, no player); a player that fails after starting does not trigger it |
+| `ding_command` | (empty) = the packaged `sounds/ding.wav` via `play-phrase.sh --ding` | fallback sound when there is no voice line to play (empty library, no player); a player that fails after starting does not trigger it |
+| `attention` | `true` | a permission prompt, question or elicitation raises the `?` marker and plays the character's voice line (see "Claude Code hooks") |
+| `attention_repeat_s` | `0` | repeat the attention ding every this many seconds while the request is unanswered (`0` = once) |
 | `lead_in_ms` | `0` | play this much silence (0-3000) with the same player right before each clip, so a sleeping or Bluetooth speaker wakes on the silence instead of eating the start of the speech; adds the value plus about 0.15 s to every ding. Try `300` if clips start cut off |
 | `dup_window_ms` | `2000` | a ding for the same character that follows another within this time is dropped (finish + question of one tab, two panes) |
 | `ding_when_focused` | `false` | also ding when the finished tab is the active one |
@@ -251,7 +286,7 @@ code).
 | `blink_ms` | `900` | blink phase (200-5000) |
 | `blink_timeout_s` | `600` | stop blinking after this (0 = never) |
 | `race_icons` | `true` | show the character icon (colour font) or its initials badge |
-| `race_font` | `auto` | colour WC3 icon font. `auto` = on when the hook found the `WC3 Icons` font installed (`fc-list`, re-checked every 10 min; macOS never), otherwise each tab shows a 2-cell initials badge (`AM` Arthas Menethill, `ČA` Čarodějka; unique for all 92 characters) on a chip of the character's colour, which works in any terminal. `true`/`false` force |
+| `race_font` | `auto` | colour WC3 icon font. `auto` = on when the hook found the `WC3 Icons` font installed (`fc-list`, re-checked every 10 min; macOS never), otherwise each tab shows a 2-cell initials badge (`AM` Arthas Menethill, `ČA` Čarodějka; unique for all 92 characters) on a chip of the character's colour, which works in any terminal. `true` forces the icon font, `false` forces the initials badges |
 | `race_tab_colors` | `true` | tint tabs in the character's colour |
 | `race_dim` | `0.4` | brightness of inactive tinted tabs (0.1-1.0) |
 | `race_all_tabs` | `false` | give characters to tabs without Claude too |
@@ -268,17 +303,17 @@ Run inside a zellij pane:
 
 ```sh
 <pkg>/claude-ctl.sh ding [character]    # play a voice line now (default: active tab's character)
-<pkg>/claude-ctl.sh character "Thrall"  # set the active tab's character
+<pkg>/claude-ctl.sh character "Thrall"  # set the active tab's character (a name is required)
 <pkg>/claude-ctl.sh race orc            # give the active tab a (least used) character of that race
 <pkg>/claude-ctl.sh reshuffle           # forget all assignments, hand them out again
 <pkg>/play-phrase.sh --list ""          # race<TAB>character for every character with playable clips
-<pkg>/dev.sh [-s SESSION | --all] [--watch]   # rebuild + hot reload
+<pkg>/dev.sh [-s SESSION | --all] [--watch] [-p URL | -a [ALIAS]]   # rebuild + hot reload
 ```
 
 ## Sounds: pruning and adding
 
 Active clips live in `sounds/wc3/<race>/`, excluded ones in `sounds/wc3/_excluded/<race>/` (never
-played). Move files between them to prune or restore (`git mv`), effective with the next ding. A
+played). Move files between them to prune or restore (`git mv`), effective with the next ding.
 A character is the file name part before the first ` - `: put `New Name - line.flac` into a race
 folder and it becomes a character (race icon, hashed colour shift) after the next library scan (30 s);
 a new folder `sounds/wc3/<name>/` becomes a new race (generic `◆` icon). Supported:
@@ -295,7 +330,10 @@ cd <pkg>
 git add claude-tabs.wasm   # commit the rebuilt wasm together with the source change
 ```
 
-Arch: `sudo pacman -S rust rust-wasm`. `target/` is git-ignored.
+The reload is `zellij action start-or-reload-plugin file:<checkout>/claude-tabs.wasm`: it finds the running
+plugin only if the layout's `location` is exactly that URL (otherwise pass `-p URL` with the layout's
+location, or `-a` to reload through a `claude-tabs` alias from `config.kdl`). Arch: `sudo pacman -S rust
+rust-wasm`. `target/` is git-ignored.
 
 ## Troubleshooting
 
@@ -312,10 +350,10 @@ Arch: `sudo pacman -S rust rust-wasm`. `target/` is git-ignored.
   to `debug.log` there. Plugin errors: `grep claude-tabs /tmp/zellij-$(id -u)/zellij-log/zellij.log`.
 - **Icons missing / boxes / wrong emoji**: `sh <pkg>/fontconfig/install.sh --check` shows what fontconfig
   picks (`WC3 Icons` expected for `charset=1fa70`); install with `fontconfig/install.sh`, then restart the
-  terminal (kitty: ctrl+shift+f5). ghostty needs its `font-codepoint-map` lines (Quick start table). An old
-  kitty `symbol_map` must cover U+1F7E0-U+1F7E6,U+1FA70-U+1FAD6 (a stale U+F0100 range gives grey blobs) or
-  be removed. Terminals that cannot draw it: `race_font "false"`. The font is tuned for kitty font_size 18 /
-  cell_height 110% (`assets/wc3-icons/README.md` to retune).
+  terminal (kitty: ctrl+shift+f5). ghostty needs its `font-codepoint-map` line (Quick start table). An old
+  kitty `symbol_map` must cover U+1FA70-U+1FAD6 (a stale U+F0100 range gives grey blobs) or be removed.
+  Terminals that cannot draw it: `race_font "false"` (initials badges). The font is tuned for reference
+  cells of 14x36 px (kitty font size 18, 110% line height; `assets/wc3-icons/README.md` to retune).
 - **New option has no effect**: options are fixed at session start; start a new session.
 - **Old bar after an update**: sessions started before keep their plugin; `dev.sh -s SESSION` reloads
   the code, a new session picks up everything.
@@ -325,11 +363,15 @@ Arch: `sudo pacman -S rust rust-wasm`. `target/` is git-ignored.
   the `setup.sh` of the copy the layout points at).
 - **Bar says "permissions denied"**: the prompt was answered with `n`. Start a new session and answer `y`,
   or pre-grant with `<pkg>/setup.sh --permissions`.
-- **Hooks fire twice** (two dings, doubled state changes): the plugin and old `settings.json` hooks are both
-  active; `<pkg>/setup.sh` shows it, `<pkg>/setup.sh --migrate-to-plugin` removes the old entries.
+- **Hooks registered twice** (doubled process spawns, relies on the duplicate marker): the plugin and old
+  `settings.json` hooks are both active; `<pkg>/setup.sh` shows it, `<pkg>/setup.sh --migrate-to-plugin`
+  removes the old entries.
 - **No sounds / no agent counts, everything else fine**: the plugin cannot find the scripts. It learns the
-  package directory from the hooks (`pkgdir` in `/tmp/zellij-$(id -u)/zellij-claude/`), so start a `claude`
-  in the session once (plugin installed?), or set the `package_dir` option in the layout's plugin block.
+  package directory (`package_dir`, the folder with the scripts and `sounds/`) from the hooks (the file
+  `pkgdir` in `/tmp/zellij-$(id -u)/zellij-claude/`), so start a `claude` in the session once (plugin
+  installed?), or set the `package_dir` option in the layout's plugin block.
+- **Bar and hooks disagree after `claude plugin update`**: the layout loads the marketplace clone's wasm,
+  which only changes with `claude plugin marketplace update zellij-wc3cz`.
 
 ## macOS checklist (not tested on a Mac)
 

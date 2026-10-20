@@ -1,7 +1,7 @@
 # Warcraft III voice lines, Czech dub (claude-tabs notification sounds)
 
 When a Claude Code agent in a zellij tab finishes, the `claude-tabs` plugin plays a random line of
-that tab's race from this folder (`play-phrase.sh`, never the same clip twice in a row).
+that tab's character from this folder (`play-phrase.sh`, never the same clip twice in a row).
 
 ## Layout
 
@@ -11,7 +11,7 @@ sounds/wc3/_excluded/<race>/<character> - <transcript>.flac  excluded clips (nev
 sounds/wc3/manifest.tsv                                     one row per clip
 ```
 
-- Races: `human`, `orc`, `undead`, `nightelf`, `naga`, `demon`, `neutral` (heroes are filed under their faction).
+- Races (folders; a character is the file name part before the first ` - `): `human`, `orc`, `undead`, `nightelf`, `naga`, `demon`, `neutral` (heroes are filed under their faction).
 - Only files directly inside `<race>/` are played; folders starting with `_` or `.` are ignored, so
   `_excluded/` is never a race. A new folder with audio becomes a new race (generic icon).
 - Format: FLAC level 8, mono, 48 kHz, 16 bit, lossless copies of the WAV masters (decoded PCM
@@ -40,7 +40,7 @@ informational, the folders are what counts. Exclusion reasons came from an indep
 Source: the YouTube playlist of the Czech Warcraft III unit responses,
 https://www.youtube.com/playlist?list=PLQNF-ZjhDFeDZaqd5qCr6dE60e1XXgNnP (7 videos: humans, orcs,
 undead, night elves, naga, heroes, neutral units). Pipeline (scripts and WAV masters are kept
-outside this repo, in `~/Music/wc3-cz` on the author's machine):
+outside this repo):
 
 1. download with yt-dlp (WAV 44.1 kHz),
 2. vocal separation with Demucs (`htdemucs`, two stems) to remove music and effects,
@@ -53,5 +53,5 @@ outside this repo, in `~/Music/wc3-cz` on the author's machine):
 ## Notice
 
 The audio is third-party game content: voice recordings from the Czech dub of Warcraft III,
-(c) Blizzard Entertainment. It is included in this repository at the repository owner's decision.
+(c) Blizzard Entertainment. It is included in this repository deliberately.
 No rights to it are claimed; it is not covered by any licence of this repository. See `NOTICE`.
