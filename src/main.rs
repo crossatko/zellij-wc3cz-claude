@@ -354,6 +354,8 @@ struct State {
     sounds_dir: String,
     phrase_script: String,
     player: String,
+    lead_in_ms: u64,   // silence played before a clip (wakes a sleeping sink), 0 = off
+    dup_window_ms: u64, // same-character dings closer than this are one
     tz_offset: Option<i64>,
     tz_asked: u64,
     my_id: u32,
@@ -866,7 +868,7 @@ impl State {
             let focused = Some(tab) == active;
             if !focused || self.ding_when_focused || (self.ding_when_os_unfocused && away) {
                 let race = self.tabs.iter().find(|t| t.position == tab).and_then(|t| self.tab_chars.get(&t.tab_id)).cloned();
-                self.ding(race.as_deref());
+                self.ding(race.as_deref(), "finish", Some(pane));
             }
             if self.auto_switch && !focused {
                 switch_tab_to(tab as u32 + 1);
@@ -878,7 +880,7 @@ impl State {
             self.attn_reacted.insert(pane, (ns, now));
             if Some(tab) != active || self.ding_when_focused || (self.ding_when_os_unfocused && away) {
                 let ch = self.tabs.iter().find(|t| t.position == tab).and_then(|t| self.tab_chars.get(&t.tab_id)).cloned();
-                self.ding(ch.as_deref());
+                self.ding(ch.as_deref(), "attention", Some(pane));
             }
         }
         // an attention request on the tab in view counts as seen (the question is on screen): drop the overlay
@@ -1107,7 +1109,7 @@ impl State {
     }
 
     // Play a random clip of the character (play-phrase.sh); fall back to ding_command when there is none.
-    fn ding(&self, character: Option<&str>) {
+    fn ding(&self, character: Option<&str>, trigger: &str, pane: Option<u32>) {
         if !self.perms {
             return;
         }
@@ -1115,15 +1117,23 @@ impl State {
         // a clip of the character (play-phrase.sh); else ding_command; else the packaged ding.wav. A missing
         // play-phrase.sh (no hook has told us the package dir yet) is skipped silently.
         let ch = character.filter(|c| valid_char(c)).unwrap_or("");
+        let who = match pane {
+            Some(p) => format!("{}/{}", self.session, p),
+            None => self.session.clone(),
+        };
+        // play-phrase.sh serialises, de-duplicates and logs (ding.log). The packaged ding / ding_command run
+        // only when it reports "nothing to play / no player" (exit 3) or there is no character or script; a
+        // transient player failure after a clip may have started does NOT add a second sound.
         run_command(
             &[
                 "sh",
                 "-c",
                 concat!(
                     "p=$1; d=$2; c=$3; pl=$4; dc=$5; ",
+                    "export CLAUDE_TABS_LEAD_IN_MS=$6 CLAUDE_TABS_DUP_MS=$7 CLAUDE_TABS_TRIGGER=$8 CLAUDE_TABS_WHO=$9; ",
                     "case $p in '~/'*) p=$HOME/${p#'~/'};; esac; case $d in '~'|'~/'*) d=$HOME${d#'~'};; esac; ",
                     "case $pl in '~/'*) pl=$HOME/${pl#'~/'};; esac; ",
-                    "if [ -n \"$c\" ] && [ -n \"$p\" ] && [ -f \"$p\" ]; then sh \"$p\" \"$d\" \"$c\" \"$pl\" && exit 0; fi; ",
+                    "if [ -n \"$c\" ] && [ -n \"$p\" ] && [ -f \"$p\" ]; then sh \"$p\" \"$d\" \"$c\" \"$pl\"; r=$?; [ $r -eq 3 ] || exit $r; fi; ",
                     "if [ -n \"$dc\" ]; then eval \"$dc\"; exit $?; fi; ",
                     "if [ -n \"$p\" ] && [ -f \"$p\" ]; then exec sh \"$p\" --ding \"$pl\"; fi; exit 0"
                 ),
@@ -1133,6 +1143,10 @@ impl State {
                 ch,
                 &self.player,
                 &self.ding_command,
+                &self.lead_in_ms.to_string(),
+                &self.dup_window_ms.to_string(),
+                trigger,
+                &who,
             ],
             ctx,
         );
@@ -1278,6 +1292,8 @@ impl ZellijPlugin for State {
         }
         self.refresh_paths();
         self.player = cfg.get("player").cloned().unwrap_or_default(); // empty = autodetect in play-phrase.sh
+        self.lead_in_ms = cfg.get("lead_in_ms").and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(0).min(3000);
+        self.dup_window_ms = cfg.get("dup_window_ms").and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(2000).min(30000);
         self.my_id = get_plugin_ids().plugin_id;
         // stay selectable until the permission question is resolved: zellij draws its one-time
         // "Allow? (y/n)" prompt in this pane and only a focused pane gets the `y`. Made unselectable on
@@ -1525,7 +1541,7 @@ impl ZellijPlugin for State {
                     let t = self.tabs.iter().find(|t| t.active)?;
                     self.tab_chars.get(&t.tab_id).cloned()
                 });
-                self.ding(ch.as_deref());
+                self.ding(ch.as_deref(), "ctl", None);
             }
             return false;
         }
