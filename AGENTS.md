@@ -292,6 +292,19 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   detached session -> unfocused. Helper unit-tested with PATH stubs for every backend (17 cases incl.
   title with comma/quote, same-pid other-session title, X11 no active window, macOS ps fallback, hung
   backend -> unknown after 1 s).
+- Stale title bug (2026-10-20, owner: "finished tab flashes forever while I am on it"): zellij only rewrites
+  the host terminal title when a pane title changes, so after switching session INSIDE one client (session
+  manager) the title still names the OLD session (`quiet-magpie | Session Manager` while viewing
+  profound-horse). os-focus.sh then answered `unfocused` forever (title names another running session), so
+  the `away` finish was never acknowledged and kept blinking. Reproduced in isolated sessions (client in
+  `pktest-b`, switch to `pktest-blink` through the session manager with keys sent to MY headless client;
+  title stayed `pktest-b | ...`; stub hyprctl taking the title from the client's real OSC 0). Fix in
+  os-focus.sh: a title naming another session only counts when a client of THAT session still lives under
+  the focused pid (`ss_clients`/`under_fpid`); a title naming this session counts only when this session
+  has an attached client (no client = nobody looks at it); the all-clients `ps` fallback is used only
+  without `ss`. After the fix: stale title -> focused (finish acked within 1 s, no ding), away -> dings
+  once and blinks, focus back -> acked in ~2-3 s, also after an alias reload. Without `ss` (macOS) the
+  title is still trusted (stale title there would still read `unfocused`: unverified, open).
 - NOT verified: real macOS, Sway, X11, KDE, GNOME; terminals other than kitty (alacritty/wezterm/ghostty
   rely on the same title + pid rules; Terminal.app/iTerm2 pid only); `ding_when_os_unfocused false`
   path (simple guard, not run).

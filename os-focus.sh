@@ -103,43 +103,60 @@ fi
 
 case "$fpid" in ''|*[!0-9]*|0) echo unknown; exit 0 ;; esac
 
-# 1) the title zellij gives the host terminal
-if [ -n "$S" ]; then
-  case "$ftitle" in "$S | "*|"$S") echo focused; exit 0 ;; esac
-fi
-
-# 2) pid ancestry of the zellij clients of this session
-clients=""
-if [ -n "$S" ] && command -v ss >/dev/null 2>&1; then
+# ss_clients NAME: pids of the clients attached to session NAME (Linux; empty without ss)
+ss_clients() {
+  command -v ss >/dev/null 2>&1 || return 0
   # server side of each client connection: local path .../<session>, peer inode = the client's socket
-  clients=$(run_timeout $T ss -xpH 2>/dev/null | awk -v s="/$S" '
+  run_timeout $T ss -xpH 2>/dev/null | awk -v s="/$1" '
     { n = length($5); ls = length(s) }
     n >= ls && substr($5, n - ls + 1) == s && $8 != "0" && $8 != "*" { peer[$8] = 1; next }
     { line[NR] = $0; ino[NR] = $6 }
     END { for (i in line) if (ino[i] in peer) { t = line[i]
-            while (match(t, /pid=[0-9]+/)) { print substr(t, RSTART + 4, RLENGTH - 4); t = substr(t, RSTART + RLENGTH) } } }' | sort -u)
+            while (match(t, /pid=[0-9]+/)) { print substr(t, RSTART + 4, RLENGTH - 4); t = substr(t, RSTART + RLENGTH) } } }' | sort -u
+}
+# under_fpid PID...: success when the focused window's process is an ancestor of (or is) one of the pids
+under_fpid() {
+  for c in "$@"; do
+    p=$c; i=0
+    while [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null && [ $i -lt 30 ]; do
+      [ "$p" = "$fpid" ] && return 0
+      p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+      i=$((i + 1))
+    done
+  done
+  return 1
+}
+# 1) the title zellij gives the host terminal. It is only rewritten when a pane title changes, so it can be
+# stale; a session with no attached client at all (ss) is not being looked at whatever the title says.
+clients=""
+[ -n "$S" ] && clients=$(ss_clients "$S")
+if [ -n "$S" ]; then
+  case "$ftitle" in
+    "$S | "*|"$S")
+      if [ -n "$clients" ] || ! command -v ss >/dev/null 2>&1; then echo focused; else echo unfocused; fi
+      exit 0 ;;
+  esac
 fi
-if [ -z "$clients" ]; then
+
+# 2) pid ancestry of the zellij clients of this session
+if [ -z "$clients" ] && ! command -v ss >/dev/null 2>&1; then
   # fallback (macOS, no ss): every zellij client process (not the server, not CLI subcommands)
   clients=$(ps -axo pid=,args= 2>/dev/null | awk '
     { a = $2; sub(/.*\//, "", a) }
     a == "zellij" && $0 !~ / --server / && $0 !~ / (pipe|action|run|edit|list-sessions|ls|kill-session|delete-session|setup|plugin|web)( |$)/ { print $1 }')
 fi
-for c in $clients; do
-  p=$c; i=0
-  while [ -n "$p" ] && [ "$p" -gt 1 ] 2>/dev/null && [ $i -lt 30 ]; do
-    if [ "$p" = "$fpid" ]; then
-      # same terminal process: another window of it may be focused; trust a title naming another session
-      other=${ftitle%% | *}
-      if [ -n "$ftitle" ] && [ "$other" != "$ftitle" ] && [ "$other" != "$S" ] \
-         && run_timeout $T zellij list-sessions --short --no-formatting 2>/dev/null | grep -qxF "$other"; then
-        echo unfocused; exit 0
-      fi
-      echo focused; exit 0
-    fi
-    p=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
-    i=$((i + 1))
-  done
-done
+if under_fpid $clients; then
+  # same terminal process: another window of it may be focused, so a title naming another session counts
+  # as "elsewhere" -- unless that title is stale. The terminal title is only rewritten when a pane title
+  # changes, so after switching session inside the client (session manager) it still names the OLD
+  # session: then no client of that session lives in this terminal any more.
+  other=${ftitle%% | *}
+  if [ -n "$ftitle" ] && [ "$other" != "$ftitle" ] && [ "$other" != "$S" ] \
+     && run_timeout $T zellij list-sessions --short --no-formatting 2>/dev/null | grep -qxF "$other"; then
+    # without ss (macOS) staleness cannot be told: trust the title
+    if ! command -v ss >/dev/null 2>&1 || under_fpid $(ss_clients "$other"); then echo unfocused; exit 0; fi
+  fi
+  echo focused; exit 0
+fi
 echo unfocused
 exit 0
