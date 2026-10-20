@@ -31,7 +31,7 @@ crop=int(a[2]) if len(a)>2 else 4
 S=int(a[3]) if len(a)>3 else 144
 ASPECT=float(os.environ.get("ASPECT","0.7778"))  # bitmap width/height; 0 = square
 W=round(S*ASPECT) if ASPECT else S
-CROP_KEEP=float(os.environ.get("CROP_KEEP") or (ASPECT or 1))  # fraction of the (frame-cropped, square) width kept (centre); default = ASPECT, so no squash; less than ASPECT stretches, more squashes
+CROP_KEEP=float(os.environ.get("CROP_KEEP") or (ASPECT or 1))  # < 1: fraction of the (frame-cropped, square) width kept (centre); > 1: the height kept is 1/CROP_KEEP; default = ASPECT, so no squash
 def has_frame(im):
     """True if the 64x64 icon carries the Warcraft III button frame: the two outermost px rings on all four
     sides are grey (mean max-min channel spread < 15; portraits at the edge are coloured). All 99 shipped icons
@@ -78,6 +78,8 @@ for i,path in enumerate(SRC):
     if crop and has_frame(im): im=im.crop((crop,crop,64-crop,64-crop))  # only icons that carry the button frame
     if 0<CROP_KEEP<1:  # partial centre crop of the sides, the rest is squashed to W x S
         w,h=im.size; nw=round(w*CROP_KEEP); l=(w-nw)//2; im=im.crop((l,0,l+nw,h))
+    elif CROP_KEEP>1:  # wider than tall (ASPECT > 1): centre crop of top and bottom instead
+        w,h=im.size; nh=round(h/CROP_KEEP); t=(h-nh)//2; im=im.crop((0,t,w,t+nh))
     im=im.resize((W,S),Image.LANCZOS)
     b=io.BytesIO()
     im.save(b,"PNG",optimize=True)
