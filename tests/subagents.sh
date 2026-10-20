@@ -49,4 +49,10 @@ transcript a4 "$done_rec"; touch -t 202001010000 "$sa/agent-a4.jsonl"
 hook substart "{$tp,\"agent_id\":\"a4\",\"agent_type\":\"general-purpose\"}"
 hook done "{$tp,\"hook_event_name\":\"Stop\",\"n\":3}"
 ok "Stop keeps the marker of a resumed agent" '[ -e "$f.sub/a4" ]'
+# 5. the internal helper's SubagentStop (no marker, empty agent_type) is not activity; a real one is
+rm -f "$f.ev"
+hook substop "{$tp,\"agent_id\":\"h1\",\"agent_type\":\"\"}"
+ok "helper SubagentStop does not touch .ev" '[ ! -e "$f.ev" ]'
+hook substop "{$tp,\"agent_id\":\"a3\",\"agent_type\":\"general-purpose\"}"
+ok "SubagentStop of a known agent touches .ev and drops its marker" '[ -e "$f.ev" ] && [ ! -e "$f.sub/a3" ]'
 exit $fail

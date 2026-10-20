@@ -128,8 +128,10 @@ if [ "$1" != tool ] && [ "$1" != clear ] && [ "$1" != end ]; then
   tp=$(printf '%s' "$2" | sed -n 's/.*"transcript_path"[[:space:]]*:[[:space:]]*"\([^"]*\)\.jsonl".*/\1/p' | head -n 1)
   [ -n "$tp" ] && put "$f.sess" "$tp/subagents"
 fi
-# any event except the end of the session counts as activity (the plugin's `working_hold_s` safety net)
-case "$1" in end|notify|ask|clear) ;; *) : >"$f.ev" ;; esac
+# any event except the end of the session counts as activity (the plugin's `working_hold_s` safety net);
+# substop only when it stops a known agent (below): Claude Code sends a SubagentStop without SubagentStart and
+# with an empty agent_type for an internal helper ~2 s after the main Stop, which must not look like work
+case "$1" in end|notify|ask|clear|substop) ;; *) : >"$f.ev" ;; esac
 case "$1" in
   tool)    # optional PreToolUse/PostToolUse hook: a turn that started without UserPromptSubmit (the main
            # agent woken by a finished subagent) is working
@@ -190,6 +192,7 @@ case "$1" in
     if [ "$1" = substart ]; then
       mkdir -p "$sub" && : >"$sub/$id"
     else
+      if [ -e "$sub/$id" ] || [ -n "$(json_str agent_type "$2")" ]; then : >"$f.ev"; fi
       rm -f "$sub/$id"
       [ "$(sed -n 's/.* ag=//p' "$f.attn" 2>/dev/null)" = "$id" ] && rm -f "$f.attn"
       [ "$(sed -n 's/.* ag=//p' "$f.attn-seen" 2>/dev/null)" = "$id" ] && rm -f "$f.attn-seen"

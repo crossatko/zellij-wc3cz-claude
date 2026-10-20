@@ -165,6 +165,10 @@ written blind.
   payloads) and `--finished` on 237 real transcripts (the killed one detected). NOT verified: the real
   PostToolUse payload of TaskStop (assumed `tool_input.task_id` = agent id; a named agent's name would not
   match its marker, the Stop reconcile still catches it); a kill from the UI task list (assumed same transcript).
+- Internal helper (previous real-run finding, 2.1.304): a SubagentStop with empty `agent_type` and no
+  SubagentStart ~2 s after the main Stop. It touched `.ev`, so `working_hold_s` showed the spinner again after
+  the finish. Now a substop counts as activity only with a marker or a non-empty `agent_type`. Verified with
+  simulated payloads only.
 - Ding only on a real finish: a Stop while agents run is `done <ns> sub` (still Working); after the last one
   stops wait `subagent_grace_s` (8), then ding. Markers older than `subagent_stale_s` (900, hook env
   `ZELLIJ_CLAUDE_STALE_S`) are ignored, > 6 h dropped. `working_hold_s` (20): any hook event newer than the
