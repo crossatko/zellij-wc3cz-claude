@@ -21,12 +21,12 @@ human	Sedlák	U+1FA85	8	icons/chars/BTNPeasant.webp
 human	Střelec	U+1FA86	10	icons/chars/BTNRifleman.webp
 human	Uther the Lightbringer	U+1FA87	6	icons/chars/BTNUther.webp
 human	Čarodějka	U+1FA88	9	icons/chars/BTNSorceress.webp
-naga	Naga myrmidon	U+1FA89	10	icons/chars/BTNNagaMyrmidon.webp
+naga	Naga myrmidon	U+1FA89	11	icons/chars/BTNNagaMyrmidon.webp
 naga	Naga royal guard	U+1FA8A	11	icons/chars/BTNNagaMyrmidonRoyalGuard.webp
 naga	Naga siren	U+1FA8E	8	icons/chars/BTNNagaSummoner.webp
 naga	Sea witch	U+1FA8F	9	icons/chars/BTNNagaSeaWitch.webp
 neutral	Akama	U+1FA90	10	icons/chars/BTNAkama.webp
-neutral	Alchemist	U+1FA91	11	icons/chars/BTNHeroAlchemist.webp
+neutral	Alchemist	U+1FA91	10	icons/chars/BTNHeroAlchemist.webp
 neutral	Banditi	U+1FA92	6	icons/chars/BTNBandit.webp
 neutral	Brewmaster	U+1FA93	11	icons/chars/BTNPandarenBrewmaster.webp
 neutral	Dark Ranger	U+1FA94	7	icons/chars/BTNHeroRanger.webp
@@ -51,7 +51,7 @@ nightelf	Dryáda	U+1FAA6	10	icons/chars/BTNDryad.webp
 nightelf	Illidan Stormrage	U+1FAA7	7	icons/chars/BTNIllidan.webp
 nightelf	Jezdec na hyppogryfovi	U+1FAA8	9	icons/chars/BTNHippogriffRider.webp
 nightelf	Lovec démonů	U+1FAA9	10	icons/chars/BTNHeroDemonHunter.webp
-nightelf	Lovkyně	U+1FAAA	11	icons/chars/BTNHuntress.webp
+nightelf	Lovkyně	U+1FAAA	10	icons/chars/BTNHuntress.webp
 nightelf	Lučišnice	U+1FAAB	12	icons/chars/BTNArcher.webp
 nightelf	Maiev Shadowsong	U+1FAAC	9	icons/chars/BTNWarden.webp
 nightelf	Malfurion Stormrage	U+1FAAD	7	icons/chars/BTNMalfurion.webp
