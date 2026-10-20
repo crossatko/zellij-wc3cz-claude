@@ -38,9 +38,11 @@ written blind.
   `os-focus.sh` live next to `phrase_script` (or `agents_script`); `sounds/` via play-phrase.sh (empty
   `sounds_dir` = its own `sounds/wc3`). Scripts run as `sh <path>` (no exec bit needed) and are skipped when
   missing (scan exits 99 -> log `no .../play-phrase.sh yet`, pool = characters.tsv, retry every 5 s).
-  `pkgdir` is ONE global file: with two install dirs registered (plugin + old settings hooks) it flips on
-  every event (harmless, each flip costs one rescan). `phrase_script ""` disables clips (and, as a side
-  effect, agent counts and os-focus, which hang off its dir).
+  `pkgdir` is ONE global file (last hook writer wins): with two install dirs registered it flips on every
+  event, so the plugin keeps its current package dir once a library scan found `play-phrase.sh` there
+  (`choose_pkg`, `pkg_ok`) and switches only when that scan fails (exit 99) or `package_dir` says so.
+  `phrase_script ""` disables clips only; agent counts and os-focus look for their scripts next to the
+  package dir.
 - Permission grants are keyed by `location.to_string()` = the `~`/`$VAR`-expanded path (symlinks NOT
   resolved) or the URL verbatim (zellij 0.45.1 `wasm_bridge.rs`, layout.rs). Cache
   `${XDG_CACHE_HOME:-~/.cache}/zellij/permissions.kdl`, macOS
@@ -191,7 +193,10 @@ written blind.
   `claude-ctl.sh character <name>` / `race <race>` / `ding [character]` / `reshuffle`; pipe names
   `claude_character`, `claude_race`, `claude_ding`. play-phrase.sh matches `"<Character> - "*` in all race
   folders; a character without clips plays any clip; nothing = exit 3. The library is rescanned every 30 s
-  by EVERY tab instance (could be leader-only).
+  by the LEADER only, which publishes the result in `<state root>/library-<session>` (first line = unix
+  secs, then the `--list` lines); followers read it (fresh < 100 s) and scan themselves only when it is
+  missing/stale after a 15 s grace. Verified: 3 tabs -> 1 `--list` call per 30 s, pkgdir flips between two
+  package copies caused no extra scans.
 - Tint = `character_accent` (`src/main.rs`): the `RACES` colour in HSL, hue +-12 deg, lightness +-8 %
   (+-12 % grey neutral), saturation +-8 %, spread per tsv index (golden-ratio sequences). `tint_colors`
   (`src/tab.rs`): inactive = accent scaled to `race_dim` (0.1-1, default 0.4), text mixed to just 4.5:1;
@@ -258,17 +263,17 @@ written blind.
   `ding_when_os_unfocused false` path.
 
 ## Sounds
-- `sounds/wc3/<race>/*.flac`: 785 active clips of 91 characters (human 183, orc 163, undead 118, nightelf
-  128, naga 36, demon 19, neutral 138), `_excluded/<race>/` 53 (never played; `_`/hidden folders are never races),
+- `sounds/wc3/<race>/*.flac`: 795 active clips of 91 characters (human 186, orc 164, undead 120, nightelf
+  128, naga 37, demon 19, neutral 141; verified against `manifest.tsv` and the files), `_excluded/<race>/` 44 (never played; `_`/hidden folders are never races),
   `manifest.tsv` (file, status, exclusion_reason, race, character, transcript, duration, video, times,
   lufs, flags), README, NOTICE (Blizzard content, included at the owner's decision). FLAC level 8, mono
   48 kHz s16, -20 LUFS (tp-limited ones down to -22, a few restored ones -23), TP <= -2 dBTP; ~135 MB total,
   names NFC.
   Per-character active counts = `clips` column of `assets/wc3-icons/characters.tsv` (embedded in the wasm:
   rebuild after changing it).
-- Masters and the whole production pipeline are OUTSIDE this repo in `~/Music/wc3-cz/` (yt-dlp of
+- Masters and the whole production pipeline are OUTSIDE this repo in `<workspace>` (the owner's pipeline workspace; yt-dlp of
   playlist PLQNF-ZjhDFeDZaqd5qCr6dE60e1XXgNnP, demucs vocals, GPU whisper.cpp Vulkan in
-  `~/.local/share/wc3-gpu`, venv `~/.local/share/wc3-venv`, LLM-planned cuts in `scripts/opus/`,
+  `<gpu-whisper dir>`, python venv `<venv>`, LLM-planned cuts in `scripts/opus/`,
   validation in `work/validation/`). Never commit masters/raw/vocals.
 - Pipeline per video (`scripts/opus/`, run with the venv python): `analyze.py` (candidates) -> plan
   `work/opus/<vid>.plan` (ops S/J/D/C/T/TS/TE/X/R/OK, see `build.py` docstring) -> `build.py <vid>`
@@ -294,19 +299,19 @@ written blind.
   splits merged, Gyrokoptéra 'mysli', Krvavý mág / Rexxar / Druid drápu onsets, Pilot noise tail (2.4 s).
   Every plan edit is marked `2026-10-20` in the plans. 'Železný trol...' is now 8.15 s and excluded by
   the >8 s rule; 'Rexxar - Zvířata kolem mě...' keeps its old end to stay <= 8 s.
-- Re-package after library changes: `python3 ~/Music/wc3-cz/scripts/package_dotfiles.py --dry --plan
+- Re-package after library changes: `python3 <workspace>/scripts/package_dotfiles.py --dry --plan
   /tmp/plan.tsv`, diff it against `sounds/wc3/manifest.tsv` (sorted), then run without `--dry` (target:
   `--out DIR`, `$WC3_SOUNDS_OUT`, default this checkout's `sounds/wc3`). Exclusions come from
   `work/validation/exclude.tsv`, mapped through `work/opus/fixes_rename.tsv` (action `edges` = same line
   with new edges, exclusion inherited; recut/split/merged = re-evaluated by the rules), then
   `exclude_pinned.tsv` / `include_pinned.tsv` override; a real run rebuilds `_excluded` from these, so
   manual moves must go into those lists.
-- Backup of the workspace state before the 2026-10-20 re-cut: `~/Music/wc3-cz/work/backup-20261020-cutfix/`.
+- Backup of the workspace state before the 2026-10-20 re-cut: `<workspace>/work/backup-20261020-cutfix/`.
 - 2026-10-20 owner transcript edit (the owner edited every line in `work/edit/clips.md`, kept as
   `clips.edited.md`; `interpret.py` -> `edit_plan.applied.*`): applied by `scripts/opus/apply_edit_plan.py`
   (`gen` -> `work/opus/text_edits.tsv`, time-keyed ops merge/split/move/text that `build.py` applies after the
   plan; `check` = dry run with cutcheck; `pins` = owner status via the pinned include/exclude lists). Result
-  838 clips (785 active / 53 excluded), 743 byte-identical, 95 new cuts; merges keep the parts' outer cuts,
+  838 clips at that time (785 active / 53 excluded; later owner-review commits restored 9 clips >8 s and split one: see HEAD counts above), 743 byte-identical, 95 new cuts; merges keep the parts' outer cuts,
   split/move cuts were checked against f16 word timings and energy (`probe.py`, `align.py`). Every changed or
   restored clip was re-transcribed with f16 (`verify_textedit.py`, `work/textedit/verify.tsv`). Not applied:
   the 'magii | to se dá snést' split and moving 'Nechte to na mě.' to the next Trollí lovec lebek line (no
@@ -315,7 +320,7 @@ written blind.
   8 s stay excluded ('too long'): Přízračný chodec, Akolyta, Smrtonožka, Naga royal guard, Lord Garithos,
   Kapitán; restored long clips are active by the owner's decision. `Rytíř (nejistý)` is now
   `Rytíř 2 (knight rider on horse)` (the horse-riding knight, owner), restored. Backup of the state before:
-  `~/Music/wc3-cz/work/backup-20261020-textedit/`.
+  `<workspace>/work/backup-20261020-textedit/`.
 - Exclusions are heuristic apart from the owner's edit; prune by moving lines in a regenerated
   `work/edit/clips.md` (`gen_clips.py --force`, edit, `interpret.py`) or by the pinned lists.
 - Players: autodetect afplay, pw-play, paplay, ffplay, aplay; extensions per player (`claude_exts`:
@@ -358,12 +363,8 @@ written blind.
   verified, tune bitmap size per terminal. Until then macOS uses initials badges.
 
 ## Known issues / caveats
-- `pkgdir` is one global file: with several Claude copies (plugin + settings hooks) it flips and forces
-  library rescans.
-- Closed-pane cleanup does not remove `<pane>.attn-seen`.
-- Every tab instance scans the library every 30 s (could be leader-only).
-- `phrase_script ""` also disables agent counts and os-focus.
-- `is_icon_font_char` assumes width 2 for U+1FA70..1FAFF (see Icon codepoints).
+- With two package copies the plugin sticks to the first confirmed one (not necessarily the newest);
+  `package_dir` forces one. Followers adopt "confirmed" from the leader's library file, not from a scan.
 - Bluetooth wake-up clipping of the first ms is a hypothesis; use `lead_in_ms` to test.
 - The font flag says "installed", not "this terminal draws it": alacritty/ghostty need extra terminal
   config (README); colour icons are unverified on macOS and other terminals. Such users set `race_font off`.
