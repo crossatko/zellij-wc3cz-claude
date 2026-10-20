@@ -306,6 +306,7 @@ strings or bare true/false (`true/1/yes/on`, `false/0/no/off`); they are read wh
 | `race_font` | `auto` | colour WC3 icon font. `auto` = on when the hook found the `WC3 Icons` font installed (`fc-list`, re-checked every 10 min; macOS never), otherwise each tab shows a 2-cell initials badge (`AM` Arthas Menethill, `ČA` Čarodějka; unique for all 92 characters) on a chip of the character's colour, which works in any terminal. `true` forces the icon font, `false` forces the initials badges |
 | `race_tab_colors` | `true` | tint tabs in the character's colour |
 | `race_dim` | `0.4` | brightness of inactive tinted tabs (0.1-1.0) |
+| `plain_dim` | `0.4` | brightness of inactive untinted tabs (plain tabs): the theme's ribbon colour blended toward the bar background (0.1-1.0, 1.0 = theme colour as is) |
 | `race_all_tabs` | `false` | give characters to tabs without Claude too |
 | `characters` | (empty) | fixed character pool, comma separated (names have spaces), e.g. `"Thrall, Arthas Menethill, Illidan Stormrage"`; empty = every character that has clips |
 | `races` | (empty) | only characters of these races, e.g. `"human orc undead"` (combines with `characters`) |

@@ -88,6 +88,21 @@ pub fn tint_colors(accent: (u8, u8, u8), active: bool, dim: f32) -> ((u8, u8, u8
     (bg, mix(bg, white, hi))
 }
 
+// Inactive tabs without a tint (plain tabs): the theme's ribbon background blended toward the bar background
+// by `dim` (1.0 = unchanged), text = the darker/lighter end that reaches just 4.5:1 on it, so plain tabs
+// recede like the dimmed tinted ones and stay readable.
+pub fn plain_colors(bar: (u8, u8, u8), ribbon: (u8, u8, u8), dim: f32) -> ((u8, u8, u8), (u8, u8, u8)) {
+    let bg = mix(bar, ribbon, dim);
+    let (white, black) = ((255, 255, 255), (0, 0, 0));
+    let end = if contrast(bg, white) >= contrast(bg, black) { white } else { black };
+    let (mut lo, mut hi) = (0.0f32, 1.0f32);
+    for _ in 0..12 {
+        let mid = (lo + hi) / 2.0;
+        if contrast(bg, mix(bg, end, mid)) >= 4.5 { hi = mid } else { lo = mid }
+    }
+    (bg, mix(bg, end, hi))
+}
+
 fn best_text(bg: (u8, u8, u8)) -> (u8, u8, u8) {
     let (black, white) = ((0u8, 0u8, 0u8), (255u8, 255u8, 255u8));
     if contrast(bg, black) >= contrast(bg, white) { black } else { white }
@@ -111,6 +126,7 @@ pub fn render_tab(
     separator: &str,
     dimmed: bool,
     show_other_clients: bool,
+    plain_dim: f32,
 ) -> LinePart {
     let focused_clients: &[ClientId] = if show_other_clients { tab.other_focused_clients.as_slice() } else { &[] };
     let separator_width = separator.width();
@@ -153,6 +169,18 @@ pub fn render_tab(
     let (background_color, foreground_color) = match tint {
         Some((bg, fg)) => (PaletteColor::Rgb(bg), PaletteColor::Rgb(fg)),
         None => (background_color, foreground_color),
+    };
+    // inactive plain tab (no tint): subdue the theme's bright ribbon colours (option plain_dim)
+    let (background_color, foreground_color) = match (
+        tint.is_some() || dimmed || look_active || tab.is_flashing_bell || plain_dim >= 1.0,
+        palette.text_unselected.background,
+        background_color,
+    ) {
+        (false, PaletteColor::Rgb(bar), PaletteColor::Rgb(rb)) => {
+            let (bg, fg) = plain_colors(bar, rb, plain_dim);
+            (PaletteColor::Rgb(bg), PaletteColor::Rgb(fg))
+        }
+        _ => (background_color, foreground_color),
     };
     let text_style = if dimmed {
         style!(palette.ribbon_unselected.base, background_color).italic()
@@ -263,6 +291,7 @@ pub fn tab_style(
     capabilities: PluginCapabilities,
     dimmed: bool,
     show_other_clients: bool,
+    plain_dim: f32,
 ) -> LinePart {
     let separator = tab_separator(capabilities);
 
@@ -279,7 +308,7 @@ pub fn tab_style(
         is_alternate_tab = false;
     }
 
-    render_tab(tabname, icon, tab, is_alternate_tab, palette, separator, dimmed, show_other_clients)
+    render_tab(tabname, icon, tab, is_alternate_tab, palette, separator, dimmed, show_other_clients, plain_dim)
 }
 
 pub(crate) fn get_tab_to_focus(
@@ -309,4 +338,27 @@ pub(crate) fn get_clicked_line_part(
         len += tab_line_part.len;
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_colors_blend() {
+        let bar = (0x23, 0x20, 0x22);
+        let rib = (0xd5, 0xb9, 0xbb);
+        assert_eq!(plain_colors(bar, rib, 1.0).0, rib);
+        assert_eq!(plain_colors(bar, rib, 0.0).0, bar);
+        let mut prev = 255.0;
+        for d in [1.0f32, 0.7, 0.5, 0.4, 0.25, 0.1] {
+            let (bg, fg) = plain_colors(bar, rib, d);
+            println!("plain_dim {d}: bg {bg:?} fg {fg:?} contrast {:.2}", contrast(bg, fg));
+            assert!(contrast(bg, fg) >= 4.4);
+            assert!(rel_lum(bg) < prev + 1e-6);
+            prev = rel_lum(bg);
+        }
+        let (bg, _) = plain_colors(bar, rib, 0.4);
+        assert!(rel_lum(bg) < rel_lum(rib) / 2.0);
+    }
 }

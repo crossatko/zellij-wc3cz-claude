@@ -352,6 +352,7 @@ struct State {
     race_icons: bool,
     race_tab_colors: bool,
     race_dim: f32,
+    plain_dim: f32,
     show_other_clients: bool,
     blink: bool,
     spinner: bool,
@@ -1390,6 +1391,7 @@ impl ZellijPlugin for State {
         self.active_underline = truthy(cfg.get("active_underline"), false);
         self.tab_numbers = truthy(cfg.get("tab_numbers"), false);
         self.race_dim = cfg.get("race_dim").and_then(|v| v.parse::<f32>().ok()).map_or(0.4, |v| v.clamp(0.1, 1.0));
+        self.plain_dim = cfg.get("plain_dim").and_then(|v| v.parse::<f32>().ok()).map_or(0.4, |v| v.clamp(0.1, 1.0));
         self.race_all_tabs = truthy(cfg.get("race_all_tabs"), false);
         self.races_opt = cfg
             .get("races")
@@ -1979,7 +1981,7 @@ impl State {
                 };
                 Icon { glyph, color, race, badge, state, tint, dim: self.race_dim, blink: self.tab_blink(t), underline: self.active_underline }
             });
-            all.push(tab_style(name, icon, t, alt, colors, self.mode_info.capabilities, dimmed, self.show_other_clients));
+            all.push(tab_style(name, icon, t, alt, colors, self.mode_info.capabilities, dimmed, self.show_other_clients, self.plain_dim));
             alt = !alt;
         }
         TabRenderData {
