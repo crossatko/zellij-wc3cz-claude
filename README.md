@@ -308,6 +308,7 @@ strings or bare true/false (`true/1/yes/on`, `false/0/no/off`); they are read wh
 | `race_dim` | `0.4` | brightness of inactive tinted tabs (0.1-1.0) |
 | `plain_dim` | `0.18` | brightness of inactive untinted tabs (plain tabs): the theme's ribbon colour blended toward the bar background (0.1-1.0, 1.0 = theme colour as is). The default gives a plain tab the same luminance as the median inactive Claude tab at `race_dim` 0.4 |
 | `race_all_tabs` | `false` | give characters to tabs without Claude too |
+| `diversity` | `true` | new characters are picked by weighted random against the session's tabs: unused characters only, then less likely when the race, hero/unit role, sex or voice theme matches an existing tab (twice as much for the adjacent tab; never the same race with the same role or theme next to each other), and when picked recently. `false` = uniform random among unused characters |
 | `characters` | (empty) | fixed character pool, comma separated (names have spaces), e.g. `"Thrall, Arthas Menethill, Illidan Stormrage"`; empty = every character that has clips |
 | `races` | (empty) | only characters of these races, e.g. `"human orc undead"` (combines with `characters`) |
 | `sounds_dir` | (empty) = `<package_dir>/sounds/wc3` | voice line library `<dir>/<race>/<Character> - <line>.flac` (empty = `sounds/wc3` next to `play-phrase.sh`) |

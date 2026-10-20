@@ -220,7 +220,20 @@ written blind.
   (`play-phrase.sh --list` = `race<TAB>prefix`) is resolved against the tsv (`resolve_scan`); unknown names
   stay as listed (race icon, hashed accent). Pool = option `characters` (comma separated) else every scanned
   character with clips (all tsv rows before the first scan; assignment waits for it), narrowed by `races`.
-  Least-used first, random among ties; stored per stable `tab_id` (`create_new`, first writer wins).
+  Least-used first, then diversity-weighted random among ties (below); stored per stable `tab_id` (`create_new`, first writer wins).
+  Diversity (`assign_chars`, `diverse_pick`, option `diversity`, default on): tsv columns `role` (hero/unit),
+  `sex` (m/f, `-` = unknown/group), `theme` (coarse voice/style family: demon, arcane, knight, nature,
+  undead, troll, orcish, shaman, goblin, machine, rider, naga, nightelf; `-` = none) are filled by hand from
+  the WC3 unit types (sex only where certain; theme is a heuristic, NOT derived from voice actors, none
+  known). Weight per candidate = 1/(1+P)^2, P = sum over the session's tabs of race 1.0 + role 0.5 + sex 0.5 +
+  theme 1.5 (unknown never matches), x2 for the adjacent tab (tab position distance 1); x0.4 if in the last 8
+  of `/tmp/zellij-claude/recent-characters` (cross-session, 16 lines); divided by (candidates of its race)^0.5
+  so 2-character races are not starved. Hard: candidates with the same race AND (same role or same theme) as
+  an adjacent tab are dropped when any other remains. Constants `DIV_*` in `src/main.rs`. Verified: unit
+  tests (`cargo test diversity`, `sh tests/diversity.sh`; 1000 simulated sessions of 2-8 tabs, fixed seed):
+  0 adjacent hard clashes, adjacent same-theme 20 vs 255 for uniform random, races 291/955/490/860/777/887/737
+  (demon/human/naga/neutral/nightelf/orc/undead) vs 109/1192/223/889/781/1043/760. NOT verified in a live
+  session. Existing tabs are never reassigned; `claude_race`/`claude_character` pipes are unchanged.
   `claude-ctl.sh character <name>` / `race <race>` / `ding [character]` / `reshuffle`; pipe names
   `claude_character`, `claude_race`, `claude_ding`. play-phrase.sh matches `"<Character> - "*` in all race
   folders; a character without clips plays any clip; nothing = exit 3. The library is rescanned every 30 s
