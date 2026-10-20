@@ -398,3 +398,9 @@ written blind.
   of a voice line is an untested hypothesis (try `lead_in_ms`).
 - Resume: `sh setup.sh` (status), `./dev.sh -s <isolated session>` (build + reload), `claude plugin
   validate .`; rebuild and commit the wasm after every source change.
+- Install audit (Linux, kitty, checkout + Claude Code plugin both present): hooks only via the plugin (cache dir =
+  `${CLAUDE_PLUGIN_ROOT}`, writes `pkgdir`), none in settings.json; checkout wasm == fresh build; font + kitty
+  `symbol_map` for BOTH U+1F7E0-1F7E6 (race fallbacks, still emitted) and U+1FA70-1FAD6 (characters) are needed.
+  Found the installed marketplace clone and cache copy carrying a newer `claude-agents.sh` than git HEAD
+  (record-skipping, last-16-lines version); committed after a check on 47 real transcripts (same result as the old version, robust to records appended after the final message).
+  Screenshot test in an isolated kitty+zellij session passed (portraits, tint, clock, no prompt).
