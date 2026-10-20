@@ -26,7 +26,18 @@ done
 here=$(cd -P "${self%/*}/" 2>/dev/null && pwd -P) || here=$(dirname "$0")
 . "$here/claude-lib.sh"
 
-expand() { eval "printf '%s' \"$1\"" 2>/dev/null; }   # expands a leading ~ / $HOME
+# expands a leading ~ / $HOME (no eval: the value is data and may contain quotes, $ or backticks)
+expand() {
+  case $1 in
+    '~') printf '%s' "$HOME" ;;
+    '~/'*) printf '%s' "$HOME/${1#'~/'}" ;;
+    '$HOME') printf '%s' "$HOME" ;;
+    '$HOME/'*) printf '%s' "$HOME/${1#'$HOME/'}" ;;
+    '${HOME}') printf '%s' "$HOME" ;;
+    '${HOME}/'*) printf '%s' "$HOME/${1#'${HOME}/'}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
 
 default_dir() { printf '%s' "$here/sounds/wc3"; }
 sounds_dir() {   # $1 = option value (may be empty)
@@ -98,20 +109,33 @@ ms_now() { echo $(( $(now_ns) / 1000000 )); }
 lock_release() { if [ "$held" = 1 ]; then rm -rf "$lock_dir"; held=0; fi; }
 trap 'lock_release' EXIT
 trap 'exit 143' TERM INT HUP
+# lock_acquire: 0 = held, 1 = impossible (root not writable) or not obtained within ~12 s. A dead owner is
+# replaced at once; a lock held (or half-created, no pid yet) for 5 s is replaced as stale. Stealing renames
+# the lock dir to a unique name first (rename is atomic: of several waiters only one wins), then deletes it.
 lock_acquire() {
-  _i=0
+  _t0=$(ms_now)
   while ! mkdir "$lock_dir" 2>/dev/null; do
+    [ -d "$root" ] && [ -w "$root" ] || return 1
     _o=$(cat "$lock_dir/pid" 2>/dev/null)
-    _i=$((_i + 1))
-    if { [ -n "$_o" ] && ! kill -0 "$_o" 2>/dev/null; } || [ "$_i" -gt 50 ]; then
-      rm -rf "$lock_dir"   # dead owner, or stuck for ~5 s
-      _i=0
+    _age=$(( $(ms_now) - _t0 ))
+    [ "$_age" -le 12000 ] || return 1
+    if { [ -n "$_o" ] && ! kill -0 "$_o" 2>/dev/null; } || [ "$_age" -gt 5000 ]; then
+      _mv=$lock_dir.stale.$$
+      if mv "$lock_dir" "$_mv" 2>/dev/null; then
+        _n=$(cat "$_mv/pid" 2>/dev/null)
+        if [ "$_n" != "$_o" ] && [ -n "$_n" ] && kill -0 "$_n" 2>/dev/null; then
+          # lost a race: that was a fresh live lock, give it back if the name is still free
+          [ -e "$lock_dir" ] || mv "$_mv" "$lock_dir" 2>/dev/null || :
+        fi
+        rm -rf "$_mv"
+      fi
       continue
     fi
     sleep "$tick"
   done
   held=1
   printf '%s' "$$" >"$lock_dir/pid" 2>/dev/null
+  return 0
 }
 
 # ding.log: one line per attempt, rotated at ~100 KB to ding.log.1
@@ -129,10 +153,13 @@ read_rec() {
   [ -f "$root/playing" ] && read -r p_pid p_comm p_ms p_char <"$root/playing"
   return 0
 }
+pid_is() {   # $1 pid, $2 recorded command name: alive and not a recycled PID
+  [ -n "$1" ] && kill -0 "$1" 2>/dev/null || return 1
+  _c=$(ps -p "$1" -o comm= 2>/dev/null)
+  [ -z "$_c" ] || [ -z "$2" ] || [ "$_c" = "$2" ]
+}
 rec_alive() {   # the recorded script is still running (and is not a recycled PID)
-  [ -n "$p_pid" ] && [ "$p_pid" != "$$" ] && kill -0 "$p_pid" 2>/dev/null || return 1
-  _c=$(ps -p "$p_pid" -o comm= 2>/dev/null)
-  [ -z "$_c" ] || [ "$_c" = "$p_comm" ] || return 1
+  [ "$p_pid" != "$$" ] && pid_is "$p_pid" "$p_comm" || return 1
   [ $(( $(ms_now) - ${p_ms:-0} )) -lt 120000 ]
 }
 
@@ -156,7 +183,9 @@ silence_wav() {
 pick_clip() {
   pick=
   if [ -z "$files" ]; then pick=$ding_wav; return; fi
-  state="$root/last-$(printf '%s' "${char:-any}" | tr -c 'A-Za-z0-9._-' '_')"
+  # file name = readable ASCII part + hex of the name's bytes (distinct names never share a file)
+  _h=$(printf '%s' "${char:-any}" | head -c 100 | od -An -tx1 | tr -d ' \n')
+  state="$root/last-$(printf '%s' "${char:-any}" | tr -c 'A-Za-z0-9' '_' | cut -c1-24)-$_h"
   _f=$files
   n=$(printf '%s\n' "$_f" | wc -l | tr -d ' ')
   last=$(cat "$state" 2>/dev/null)
@@ -172,18 +201,19 @@ pick_clip() {
 play_serial() {
   ding_wav="$here/sounds/ding.wav"
   queued=; waited=0
-  lock_acquire
+  lock_acquire || { ding_log failed "" "no-lock"; exit 3; }
   read_rec
   now=$(ms_now)
   if [ -n "$p_ms" ] && [ "$p_char" = "$dkey" ] && [ $(( now - p_ms )) -lt "$dup_ms" ]; then
     lock_release; ding_log dropped-duplicate "" "age_ms=$(( now - p_ms ))"; exit 0
   fi
   if [ -n "$p_ms" ] && rec_alive; then
-    _q=$(cat "$root/queued" 2>/dev/null)
-    if [ -n "$_q" ] && kill -0 "$_q" 2>/dev/null; then
+    _q=; _qc=; { read -r _q _qc <"$root/queued"; } 2>/dev/null
+    if pid_is "$_q" "$_qc"; then
       lock_release; ding_log dropped-queue-full "" ""; exit 0
     fi
-    printf '%s' "$$" >"$root/queued"
+    _comm=$(ps -p "$$" -o comm= 2>/dev/null)
+    printf '%s %s\n' "$$" "${_comm:-sh}" >"$root/queued"
     lock_release
     t0=$now
     while rec_alive_now; do
@@ -193,7 +223,7 @@ play_serial() {
       sleep "$tick"
     done
     waited=$(( $(ms_now) - t0 ))
-    lock_acquire
+    lock_acquire || { rm -f "$root/queued"; ding_log failed "" "no-lock"; exit 3; }
     rm -f "$root/queued"
     read_rec
     if [ -n "$p_ms" ] && rec_alive; then
