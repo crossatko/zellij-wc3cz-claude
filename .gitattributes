@@ -1,0 +1,7 @@
+# binary assets: no text diffs / eol conversion (no Git LFS in this repo)
+*.flac binary
+*.wav binary
+*.wasm binary
+*.ttf binary
+*.webp binary
+*.png binary
