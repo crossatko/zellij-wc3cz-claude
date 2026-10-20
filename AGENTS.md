@@ -328,19 +328,49 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   path (simple guard, not run).
 
 ## Sounds
-- `sounds/wc3/<race>/*.flac`: 800 active clips (human 177, orc 159, undead 117, nightelf 133, naga 38,
-  demon 18, neutral 158), `_excluded/<race>/` 75 (never played; `_`/hidden folders are never races),
+- `sounds/wc3/<race>/*.flac`: 799 active clips (human 177, orc 159, undead 117, nightelf 132, naga 39,
+  demon 18, neutral 157), `_excluded/<race>/` 74 (never played; `_`/hidden folders are never races),
   `manifest.tsv` (file, status, exclusion_reason, race, character, transcript, duration, video, times,
   lufs, flags), README, NOTICE (Blizzard content, included at the owner's decision). FLAC level 8, mono
-  48 kHz s16, -20 LUFS, TP <= -2 dBTP; ~138 MB total, largest file 0.4 MB, names NFC.
+  48 kHz s16, -20 LUFS (tp-limited ones down to -22), TP <= -2 dBTP; ~135 MB total, names NFC.
+  Per-character active counts = `clips` column of `assets/wc3-icons/characters.tsv` (embedded in the wasm:
+  rebuild after changing it).
 - Masters and the whole production pipeline are OUTSIDE this repo in `~/Music/wc3-cz/` (yt-dlp of
   playlist PLQNF-ZjhDFeDZaqd5qCr6dE60e1XXgNnP, demucs vocals, GPU whisper.cpp Vulkan in
-  `~/.local/share/wc3-gpu`, LLM-planned cuts in `scripts/opus/`, validation in `work/validation/`).
-  Never commit masters/raw/vocals. Re-package after library changes:
-  `python3 ~/Music/wc3-cz/scripts/package_dotfiles.py --dry` then without `--dry`; its target path still
-  points at the OLD dotfiles location (`config/zellij/sounds/wc3`) and must be updated to this
-  checkout's `sounds/wc3` first (not done). A real run rebuilds `_excluded` from its lists, undoing
-  manual moves: diff against manifest.tsv first.
+  `~/.local/share/wc3-gpu`, venv `~/.local/share/wc3-venv`, LLM-planned cuts in `scripts/opus/`,
+  validation in `work/validation/`). Never commit masters/raw/vocals.
+- Pipeline per video (`scripts/opus/`, run with the venv python): `analyze.py` (candidates) -> plan
+  `work/opus/<vid>.plan` (ops S/J/D/C/T/TS/TE/X/R/OK, see `build.py` docstring) -> `build.py <vid>`
+  (refine cuts, cutcheck gate, render) -> `verify.py <vid>` (q5 re-transcription) -> `finalize.py`
+  (rebuilds `clips/` + manifest; replaced files go to `work/opus/superseded/`) -> package.
+- Cut validation (2026-10-20): `cutcheck.py` runs inside `build.py` before rendering and STOPS the build
+  on errors (`CUTCHECK=warn` renders anyway). An edge passes if it is in a pause (energy <= max(peak-35,
+  min(local floor+6, peak-25)) dB), at the bottom of a pause on a noise bed (<= peak-25 and within 3 dB of
+  the +-0.15 s minimum) or on a soft slope (reaches the pause level within 0.10 s, never above peak-20);
+  the first/last Whisper word must not start >0.25 s before the start / after the end. Exceptions are
+  accepted per line with `OK <anchor> reason` (`OK X<start>` for X lines); 19 such lines exist (DTW word
+  starts in the pause, flat noise/growl beds, the Gyrokoptéra 'mysli'/'Ouha' junction). It also warns
+  when a cut is >0.10 s from the bottom of the adjacent gap (58 active clips left, capped by the next line
+  or the 0.5 s limit). `refine()`: a split with no >=0.1 s pause looks up to 0.6 s past the next line's
+  DTW start for a real pause instead of cutting at the quietest frame (that cut 'zmrzlinou' in half);
+  `extend_edges()` moves every start back / end forward to the bottom of the gap (<= 0.5 s, never into
+  the neighbouring line's onset/offset or word starts, plan TS/TE stay exact).
+- 2026-10-20 re-cut: before, ~28 % of the active clips had a clipped tail/onset or a cut in sound
+  (226/798 with a cutcheck error or valley warning), now 58/799 warnings, 0 unaccepted errors. 327 clips
+  only got longer edges (530 are byte-identical); fixed by plan: Lord Garithos split off by one word,
+  Trollí čarodějnice 'zmrzlinou' cut mid-word (+ 'Hm' was its end: now 'To vypadá dobře'), two Naga
+  myrmidon X ends, Minometčíci 'Aha, jasně,' moved to the next line, Lovkyně and Alchemist half-sentence
+  splits merged, Gyrokoptéra 'mysli', Krvavý mág / Rexxar / Druid drápu onsets, Pilot noise tail (2.4 s).
+  Every plan edit is marked `2026-10-20` in the plans. 'Železný trol...' is now 8.15 s and excluded by
+  the >8 s rule; 'Rexxar - Zvířata kolem mě...' keeps its old end to stay <= 8 s.
+- Re-package after library changes: `python3 ~/Music/wc3-cz/scripts/package_dotfiles.py --dry --plan
+  /tmp/plan.tsv`, diff it against `sounds/wc3/manifest.tsv` (sorted), then run without `--dry` (target:
+  `--out DIR`, `$WC3_SOUNDS_OUT`, default this checkout's `sounds/wc3`). Exclusions come from
+  `work/validation/exclude.tsv`, mapped through `work/opus/fixes_rename.tsv` (action `edges` = same line
+  with new edges, exclusion inherited; recut/split/merged = re-evaluated by the rules), then
+  `exclude_pinned.tsv` / `include_pinned.tsv` override; a real run rebuilds `_excluded` from these, so
+  manual moves must go into those lists.
+- Backup of the workspace state before the 2026-10-20 re-cut: `~/Music/wc3-cz/work/backup-20261020-cutfix/`.
 - Exclusions are heuristic (nothing was listened to); prune by moving files between `<race>/` and
   `_excluded/<race>/`. Transcripts in names are best effort; the 9 human `Rytíř (nejistý)` clips are
   probably Death Knight lines.
@@ -424,8 +454,9 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   whose default script path `~/.config/zellij/play-phrase.sh` no longer exists: no voice lines, no
   transcript-based agent counts (log: `scan found []`) until `./dev.sh -s <session>` reloads the new wasm
   (not done by the agent) or the session is restarted.
-- Open: update the external packaging script's target path; test on a Mac and other desktops;
-  `git init` + first commit by the owner.
+- Open: test on a Mac and other desktops; listen to the 2026-10-20 re-cut clips (nothing was listened to:
+  checks are energy + Whisper only); sentence fragments (lowercase / conjunction starts, mainly Lesní
+  trollové, Firelord, Banditi) are not handled yet.
 
 ## TODO: macOS icon font (needs a Mac to test)
 - The WC3 icon font is CBDT/CBLC (Google colour bitmaps), built by `assets/wc3-icons/build.py` from the 7 webp icons. Believed (NOT tested) that macOS CoreText, which kitty and Ghostty use there, does not draw CBDT; it draws Apple's `sbix`. The user thinks kitty/ghostty on macOS may support it, so test first: install the current font, set `race_font on`, and look.
