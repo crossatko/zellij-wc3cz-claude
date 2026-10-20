@@ -6,8 +6,8 @@ zellij 0.45.1) with extras for running Claude Code agents in tabs:
 - **Claude marker** `✳` before every tab that runs Claude Code, animated with Claude Code's own
   spinner while the agent works, a number for running subagents (`✳2`), a badge plus a blinking tab
   when an agent finished in a tab you have not looked at yet.
-- **Characters**: every Claude tab gets one Warcraft III character (92 with Czech voice lines, e.g.
-  Arthas Menethill, Thrall, Illidan; unique up to 92 tabs), shown as the character's portrait icon
+- **Characters**: every Claude tab gets one Warcraft III character (91 with Czech voice lines, e.g.
+  Arthas Menethill, Thrall, Illidan; unique up to 91 tabs), shown as the character's portrait icon
   (colour icon font, Linux with fontconfig) or a two-letter initials badge (any terminal). The whole tab is tinted in the
   character's colour: the race colour (human gold, orc green, undead purple, nightelf teal, naga
   blue, demon red, neutral grey) shifted a little per character, so neighbours differ but the race
@@ -384,7 +384,7 @@ printf '%s\n' "$TMPDIR"; ls "${TMPDIR%/}"/zellij-$(id -u)/   # must contain zell
 sh <pkg>/claude-hook.sh start; ls "${TMPDIR%/}"/zellij-$(id -u)/zellij-claude/*/   # a file named like the pane id
 afplay <pkg>/sounds/ding.wav
 afplay "$(ls <pkg>/sounds/wc3/human/*.flac | head -n 1)"   # FLAC through CoreAudio
-<pkg>/play-phrase.sh --list "" | wc -l      # 92 characters
+<pkg>/play-phrase.sh --list "" | wc -l      # 91 characters
 <pkg>/claude-ctl.sh ding "Thrall"         # a Thrall voice line
 date +%z; uname -s                                   # clock offset / Darwin
 ```

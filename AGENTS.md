@@ -9,7 +9,7 @@ A zellij 0.45 tab-bar plugin (Rust -> wasm32-wasip1, zellij-tile 0.45.1) that re
 `compact-bar` (ported from zellij v0.45.1 `default-plugins/compact-bar`: `line.rs`, `tab.rs`, clipboard
 hints; tooltips dropped) and adds Claude Code awareness: `✳` marker + Claude Code's spinner while working,
 running-subagent count (`✳2`), finished-unseen badge + blink, attention alerts (`?` badge), one Warcraft III
-CHARACTER per Claude tab (icon + tint + voice, 92 characters), a Czech WC3 voice line of that character when
+CHARACTER per Claude tab (icon + tint + voice, 91 characters with clips), a Czech WC3 voice line of that character when
 an agent finishes or asks (fallback `sounds/ding.wav`), cwd-based tab labels, clock. Linux verified; macOS
 written blind.
 
@@ -254,11 +254,12 @@ written blind.
   `ding_when_os_unfocused false` path.
 
 ## Sounds
-- `sounds/wc3/<race>/*.flac`: 799 active clips (human 177, orc 159, undead 117, nightelf 132, naga 39,
-  demon 18, neutral 157), `_excluded/<race>/` 74 (never played; `_`/hidden folders are never races),
+- `sounds/wc3/<race>/*.flac`: 785 active clips of 91 characters (human 183, orc 163, undead 118, nightelf
+  128, naga 36, demon 19, neutral 138), `_excluded/<race>/` 53 (never played; `_`/hidden folders are never races),
   `manifest.tsv` (file, status, exclusion_reason, race, character, transcript, duration, video, times,
   lufs, flags), README, NOTICE (Blizzard content, included at the owner's decision). FLAC level 8, mono
-  48 kHz s16, -20 LUFS (tp-limited ones down to -22), TP <= -2 dBTP; ~135 MB total, names NFC.
+  48 kHz s16, -20 LUFS (tp-limited ones down to -22, a few restored ones -23), TP <= -2 dBTP; ~135 MB total,
+  names NFC.
   Per-character active counts = `clips` column of `assets/wc3-icons/characters.tsv` (embedded in the wasm:
   rebuild after changing it).
 - Masters and the whole production pipeline are OUTSIDE this repo in `~/Music/wc3-cz/` (yt-dlp of
@@ -297,9 +298,22 @@ written blind.
   `exclude_pinned.tsv` / `include_pinned.tsv` override; a real run rebuilds `_excluded` from these, so
   manual moves must go into those lists.
 - Backup of the workspace state before the 2026-10-20 re-cut: `~/Music/wc3-cz/work/backup-20261020-cutfix/`.
-- Exclusions are heuristic (nothing was listened to); prune by moving files between `<race>/` and
-  `_excluded/<race>/`. Transcripts in names are best effort; the 9 human `Rytíř (nejistý)` clips are
-  probably Death Knight lines.
+- 2026-10-20 owner transcript edit (the owner edited every line in `work/edit/clips.md`, kept as
+  `clips.edited.md`; `interpret.py` -> `edit_plan.applied.*`): applied by `scripts/opus/apply_edit_plan.py`
+  (`gen` -> `work/opus/text_edits.tsv`, time-keyed ops merge/split/move/text that `build.py` applies after the
+  plan; `check` = dry run with cutcheck; `pins` = owner status via the pinned include/exclude lists). Result
+  838 clips (785 active / 53 excluded), 743 byte-identical, 95 new cuts; merges keep the parts' outer cuts,
+  split/move cuts were checked against f16 word timings and energy (`probe.py`, `align.py`). Every changed or
+  restored clip was re-transcribed with f16 (`verify_textedit.py`, `work/textedit/verify.tsv`). Not applied:
+  the 'magii | to se dá snést' split and moving 'Nechte to na mě.' to the next Trollí lovec lebek line (no
+  pause anywhere near the word boundary: the words stay in the previous clip and its text says so); villagers
+  and Pit Lord are fully excluded, their lines were left as they were (no merge/text fix). Merged clips over
+  8 s stay excluded ('too long'): Přízračný chodec, Akolyta, Smrtonožka, Naga royal guard, Lord Garithos,
+  Kapitán; restored long clips are active by the owner's decision. `Rytíř (nejistý)` is now
+  `Rytíř 2 (knight rider on horse)` (the horse-riding knight, owner), restored. Backup of the state before:
+  `~/Music/wc3-cz/work/backup-20261020-textedit/`.
+- Exclusions are heuristic apart from the owner's edit; prune by moving lines in a regenerated
+  `work/edit/clips.md` (`gen_clips.py --force`, edit, `interpret.py`) or by the pinned lists.
 - Players: autodetect afplay, pw-play, paplay, ffplay, aplay; extensions per player (`claude_exts`:
   afplay no Ogg, pw-play/paplay no m4a, aplay wav only).
 - `sounds/ding.wav`: derived from a downloaded chime `stu9-chime-356831.mp3` (not in the repo, licence
@@ -353,7 +367,7 @@ written blind.
 - After a reload, tabs whose last Stop was `done ... sub` show the spinner for the grace period.
 - The subagent count depends on hooks/transcripts; a missed stop sticks until stale/end/pane close.
 - Sessions started before a plugin-option change keep the old options; a new session picks them up.
-- Sentence-fragment lines in the voice library are being fixed through transcript edits.
+- Voice library: the owner's transcript edit is applied (2026-10-20); two boundaries could not be cut (see Sounds).
 
 ## Status / how to resume (2026-10-20)
 - Done: standalone git repo; Claude Code plugin + marketplace; opt-in setup.sh; fontconfig installer;
@@ -364,6 +378,7 @@ written blind.
   installed: run `setup.sh --migrate-to-plugin`. A script that used to rely on `setup.sh` doing things by
   default now needs the explicit options.
 - Open: the Known issues above; test on a Mac and other desktops/terminals; publish and verify the
-  marketplace install from GitHub; listen to the re-cut clips; sentence fragments in the library.
+  marketplace install from GitHub; listen to the re-cut clips and to the ones the transcript edit changed
+  (low Whisper similarity list in the workspace `work/textedit/verify.tsv`).
 - Resume: `sh setup.sh` (status), `./dev.sh -s <isolated session>` (build + reload), `claude plugin
   validate .`; rebuild and commit the wasm after every source change.
