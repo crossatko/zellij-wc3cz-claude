@@ -48,9 +48,10 @@ const RACES: &[(&str, &str, (u8, u8, u8), Option<&str>)] = &[
 const GENERIC_GLYPH: &str = "\u{25C6}";
 // empty = play-phrase.sh picks the packaged library: sounds/wc3 next to the script
 const DEFAULT_SOUNDS_DIR: &str = "";
-// The wasm cannot know where it was loaded from, so the helper scripts are found through the
-// `package_dir` option (the package checkout). setup.sh links ~/.config/zellij/plugins/claude-tabs to
-// the checkout, which is this default.
+// The wasm cannot know where it was loaded from. The package dir (play-phrase.sh, claude-agents.sh,
+// os-focus.sh, sounds/) is, in this order: the `package_dir` option; the path claude-hook.sh writes on
+// every event to <state root>/pkgdir (its own resolved directory: plugin cache, checkout, ...); this
+// legacy default (the link older setup.sh versions created).
 const DEFAULT_PACKAGE_DIR: &str = "~/.config/zellij/plugins/claude-tabs";
 
 // glyph + accent colour for any group name
@@ -89,6 +90,180 @@ fn valid_race(name: &str) -> bool {
     !name.is_empty() && name.len() <= 40 && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
+// A character name is any non-empty text without control characters (names have spaces, diacritics, quotes).
+fn valid_char(name: &str) -> bool {
+    !name.is_empty() && name.chars().count() <= 60 && !name.chars().any(|c| c.is_control()) && name.trim() == name
+}
+
+// One WC3 character from assets/wc3-icons/characters.tsv (embedded at build time)
+#[derive(Clone, Debug)]
+struct CharDef {
+    race: String,
+    name: String,
+    glyph: Option<char>, // icon font codepoint; None when the character has no icon yet (race icon is used)
+    ord: usize,          // index among the characters of its race
+    of: usize,           // number of characters of its race
+}
+
+const CHARACTERS_TSV: &str = include_str!("../assets/wc3-icons/characters.tsv");
+
+fn parse_characters(tsv: &str) -> Vec<CharDef> {
+    let mut v: Vec<CharDef> = Vec::new();
+    for l in tsv.lines().skip(1) {
+        let f: Vec<&str> = l.split('\t').collect();
+        if f.len() < 3 || f[1].trim().is_empty() || !valid_race(f[0].trim()) {
+            continue;
+        }
+        let cp = f[2].trim().trim_start_matches("U+").trim_start_matches("u+");
+        let glyph = if f.get(4).map_or(false, |x| !x.trim().is_empty()) {
+            u32::from_str_radix(cp, 16).ok().and_then(char::from_u32)
+        } else {
+            None
+        };
+        v.push(CharDef { race: f[0].trim().to_string(), name: f[1].trim().to_string(), glyph, ord: 0, of: 0 });
+    }
+    let races: Vec<String> = v.iter().map(|c| c.race.clone()).collect();
+    for i in 0..v.len() {
+        let same: Vec<usize> = (0..v.len()).filter(|&j| races[j] == races[i]).collect();
+        v[i].ord = same.iter().position(|&j| j == i).unwrap_or(0);
+        v[i].of = same.len();
+    }
+    v
+}
+
+fn hash_name(name: &str) -> u32 {
+    let mut h: u32 = 2166136261;
+    for b in name.bytes() {
+        h = (h ^ b as u32).wrapping_mul(16777619);
+    }
+    h
+}
+
+fn rgb_to_hsl(c: (u8, u8, u8)) -> (f32, f32, f32) {
+    let (r, g, b) = (c.0 as f32 / 255.0, c.1 as f32 / 255.0, c.2 as f32 / 255.0);
+    let (mx, mn) = (r.max(g).max(b), r.min(g).min(b));
+    let l = (mx + mn) / 2.0;
+    let d = mx - mn;
+    if d < 1e-6 {
+        return (0.0, 0.0, l);
+    }
+    let s = d / (1.0 - (2.0 * l - 1.0).abs());
+    let h = if mx == r { ((g - b) / d).rem_euclid(6.0) } else if mx == g { (b - r) / d + 2.0 } else { (r - g) / d + 4.0 };
+    (h * 60.0, s, l)
+}
+
+fn hsl_to_rgb(h: f32, s: f32, l: f32) -> (u8, u8, u8) {
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let x = c * (1.0 - ((h / 60.0).rem_euclid(2.0) - 1.0).abs());
+    let m = l - c / 2.0;
+    let (r, g, b) = match (h.rem_euclid(360.0) / 60.0) as u32 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    let f = |v: f32| ((v + m).clamp(0.0, 1.0) * 255.0).round() as u8;
+    (f(r), f(g), f(b))
+}
+
+// Accent colour of a character: the race colour with a per-character shift, so neighbours differ but the
+// race stays recognisable: hue +-12 deg, lightness +-8 % (+-12 % for the grey neutral race), saturation
+// +-8 %. Characters of a race are spread with two golden-ratio sequences over their index in characters.tsv
+// (unlisted characters: hashed). tint_colors (tab.rs) enforces text contrast whatever comes out.
+fn character_accent(race_rgb: (u8, u8, u8), name: &str, ord: Option<(usize, usize)>) -> (u8, u8, u8) {
+    let frac = |x: f32| x - x.floor();
+    let (a, b, c) = match ord {
+        Some((i, _)) => (frac(i as f32 * 0.618_034), frac(i as f32 * 0.754_878 + 0.3), frac(i as f32 * 0.569_840 + 0.6)),
+        None => {
+            let h = hash_name(name);
+            ((h & 0xff) as f32 / 255.0, ((h >> 8) & 0xff) as f32 / 255.0, ((h >> 16) & 0xff) as f32 / 255.0)
+        }
+    };
+    let (h, s, l) = rgb_to_hsl(race_rgb);
+    let grey = s < 0.15;
+    let dl = (b - 0.5) * if grey { 0.24 } else { 0.16 };
+    let ds = if grey { 0.0 } else { (c - 0.5) * 0.16 };
+    hsl_to_rgb(h + (a - 0.5) * 24.0, (s + ds).clamp(0.0, 1.0), (l + dl).clamp(0.12, 0.85))
+}
+
+// Fallback badge (no colour icon font): the character's initials, exactly 2 cells of width-1 letters.
+// Candidates in order of preference: first letter of word 1 + first letter of word 2 (single word: its
+// 2nd letter), then word 1's first letter + each further letter (word 2, rest of word 1, other words).
+// Words = whitespace separated, reduced to letters (so "-" and "(" vanish, "Kel'Thuzad" is one word).
+fn badge_candidates(name: &str) -> Vec<String> {
+    use unicode_width::UnicodeWidthChar;
+    let one = |c: char| UnicodeWidthChar::width(c) == Some(1);
+    let up = |c: char| {
+        let mut u = c.to_uppercase();
+        match (u.next(), u.next()) {
+            (Some(x), None) if one(x) => x,
+            _ => c, // multi-char uppercase (e.g. German sharp s): keep the letter
+        }
+    };
+    let words: Vec<Vec<char>> = name
+        .split_whitespace()
+        .map(|w| w.chars().filter(|c| c.is_alphabetic() && one(*c)).collect::<Vec<char>>())
+        .filter(|w| !w.is_empty())
+        .collect();
+    if words.is_empty() {
+        // no letters at all: the first two visible width-1 characters, padded to 2 cells
+        let s: String = name.chars().filter(|c| !c.is_whitespace() && one(*c)).take(2).collect();
+        return vec![format!("{:<2}", if s.is_empty() { "?".to_string() } else { s })];
+    }
+    let first = up(words[0][0]);
+    let mut rest: Vec<char> = Vec::new();
+    if words.len() > 1 {
+        rest.extend(&words[1]);
+    }
+    rest.extend(&words[0][1..]);
+    for w in words.iter().skip(2) {
+        rest.extend(w);
+    }
+    let mut out: Vec<String> = Vec::new();
+    for c in rest {
+        let s = format!("{}{}", first, up(c));
+        if !out.contains(&s) {
+            out.push(s);
+        }
+    }
+    if out.is_empty() {
+        out.push(format!("{} ", first)); // one-letter name
+    }
+    out
+}
+
+// Badges for a list of names (characters.tsv order first, so they never depend on the pool or the
+// session). A name keeps its first candidate unless an earlier name has the same one; it then takes its
+// first candidate that is nobody's first choice and not taken yet (all 92 characters end up unique).
+fn badge_table(names: &[String]) -> HashMap<String, String> {
+    let mut uniq: Vec<&String> = Vec::new();
+    for n in names {
+        if !uniq.contains(&n) {
+            uniq.push(n);
+        }
+    }
+    let cands: Vec<Vec<String>> = uniq.iter().map(|n| badge_candidates(n)).collect();
+    let mut holder: HashMap<&str, usize> = HashMap::new();
+    for (i, c) in cands.iter().enumerate() {
+        holder.entry(c[0].as_str()).or_insert(i);
+    }
+    let mut used: HashSet<String> = cands.iter().map(|c| c[0].clone()).collect();
+    let mut out = HashMap::new();
+    for (i, n) in uniq.iter().enumerate() {
+        let c = &cands[i];
+        let pick = if holder[c[0].as_str()] == i {
+            c[0].clone()
+        } else {
+            c.iter().skip(1).find(|x| !used.contains(*x)).cloned().unwrap_or_else(|| c[0].clone())
+        };
+        used.insert(pick.clone());
+        out.insert((*n).clone(), pick);
+    }
+    out
+}
+
 // Claude Code's own spinner frames (ping-pong: forward then back, period 10); all one cell wide
 const SPIN: [&str; 10] = ["\u{B7}", "\u{2722}", "\u{2733}", "\u{2736}", "\u{273B}", "\u{273D}", "\u{273B}", "\u{2736}", "\u{2733}", "\u{2722}"];
 
@@ -99,6 +274,7 @@ enum St {
     Idle,    // session running, waiting for the user (start)
     Working, // processing a prompt
     Done,    // finished, waiting for the user
+    Attn,    // needs an answer (permission prompt / question / elicitation): overlay file <pane>.attn
 }
 
 #[derive(Clone, Debug)]
@@ -107,8 +283,10 @@ struct PaneState {
     ns: u128,
     subs: usize, // running subagents (one marker file each in <pane>.sub/)
     deferred: bool, // the Stop hook found running subagents: not a real finish yet
+    quiet: bool,    // the Stop came while a question was pending: no finish ding
     away: bool,     // the Stop hook found the terminal window not OS-focused (os-focus.sh)
     sess: Option<String>, // directory with the session's agent-<id>.jsonl transcripts (written by the hook)
+    attn: Option<(u128, bool)>, // <pane>.attn: (ns, away) while Claude waits for an answer
     recent_activity: bool, // a hook event (any kind) newer than the state file, within working_hold_s
 }
 
@@ -127,9 +305,11 @@ struct State {
     // last "done" timestamp we reacted to (ding/auto switch) and last one shown as seen
     reacted: HashMap<u32, u128>,
     clock: bool,
-    races: HashMap<usize, String>, // tab id -> race (files in races/)
-    races_opt: Vec<String>,  // `races` option (empty = use the scanned sounds_dir folders)
-    scanned: Vec<String>,    // sounds_dir subfolders that hold audio files
+    tab_chars: HashMap<usize, String>, // tab id -> character (files in characters/)
+    races_opt: Vec<String>,  // `races` option: only characters of these races
+    chars_opt: Vec<String>,  // `characters` option: fixed character pool
+    defs: Vec<CharDef>,      // characters.tsv (embedded), filled in load()
+    scanned: Vec<(String, String)>, // (race, character) pairs that have clips in the library
     scan_done: bool,
     scan_asked: u64,
     race_icons: bool,
@@ -139,6 +319,8 @@ struct State {
     blink: bool,
     spinner: bool,
     task_running: HashMap<u32, Vec<String>>,
+    // when each task_running entry was last refreshed (secs); only the polling instance keeps it fresh
+    task_at: HashMap<u32, u64>,
     agents_asked: u64,
     agents_script: String,
     working_hold_s: u64,
@@ -153,7 +335,13 @@ struct State {
     last_key: String,
     blink_ms: u64,
     blink_timeout_s: u64,
-    race_font_opt: Option<bool>, // None = auto: on for Linux, off elsewhere (macOS CoreText has no CBDT bitmap fonts)
+    race_font_opt: Option<bool>, // None = auto: the hook's <state root>/font flag (WC3 Icons installed)
+    font_flag: bool,             // <state root>/font says 1
+    badges: HashMap<String, String>, // character -> 2-cell initials badge (used without the icon font)
+    pkg_opt: Option<String>,     // `package_dir` option (non-empty)
+    phrase_opt: Option<String>,  // `phrase_script` option as given (Some("") = clips off)
+    pkg_dir: String,             // effective package dir
+    pkg_missing: String,         // package dir whose play-phrase.sh was not found (logged once)
     os: String,
     os_asked: u64,
     subagent_count: bool,
@@ -179,6 +367,9 @@ struct State {
     // config
     ding_command: String,
     ding_when_focused: bool,
+    attention: bool,         // ding + marker when Claude asks something (default true)
+    attention_repeat_s: u64, // 0 = ding once per request
+    attn_reacted: HashMap<u32, (u128, u64)>, // pane -> (attn ns, secs of the last ding)
     ding_when_os_unfocused: bool,
     os_focus_ms: u64,    // last time os-focus.sh said the terminal is focused (or could not tell)
     os_focus_asked: u64,
@@ -199,7 +390,7 @@ fn truthy(v: Option<&String>, default: bool) -> bool {
 impl State {
     fn read_files(&mut self) {
         self.files.clear();
-        self.read_races();
+        self.read_chars();
         self.read_user_names();
         if self.session.is_empty() {
             return;
@@ -221,10 +412,14 @@ impl State {
             let flags: Vec<&str> = it.collect();
             let deferred = flags.contains(&"sub");
             let away = flags.contains(&"away");
+            let quiet = flags.contains(&"quiet");
             // running agents = hook markers (SubagentStart/Stop) UNION agents whose transcripts say they are
             // still running (claude-agents.sh, polled): neither source alone is reliable
             let mut ids = subagent_markers(&format!("{}/{}.sub", dir, pane), self.subagent_stale_s);
-            if let Some(t) = self.task_running.get(&pane) {
+            // ignore a transcript scan older than 10 s: only the focused tab's instance (and the leader)
+            // polls, so a stale non-empty list in another instance would keep a finished tab "Working"
+            let fresh = self.task_at.get(&pane).map_or(false, |a| now_secs().saturating_sub(*a) < 10);
+            if let Some(t) = self.task_running.get(&pane).filter(|_| fresh) {
                 for id in t {
                     if !ids.contains(id) {
                         ids.push(id.clone());
@@ -243,71 +438,120 @@ impl State {
                 }
                 _ => false,
             };
-            self.files.insert(pane, PaneState { st, ns, subs, deferred, away, recent_activity, sess });
+            // attention overlay: `<ns> [away]`; ignored when disabled or older than 12 h (a crashed session)
+            let attn = std::fs::read_to_string(format!("{}/{}.attn", dir, pane)).ok().and_then(|t| {
+                let mut w = t.split_whitespace();
+                let ns: u128 = w.next()?.parse().ok()?;
+                let away = w.any(|x| x == "away");
+                let old = now_secs().saturating_sub((ns / 1_000_000_000) as u64) > 12 * 3600;
+                if self.attention && !old { Some((ns, away)) } else { None }
+            });
+            self.files.insert(pane, PaneState { st, ns, subs, deferred, away, quiet, recent_activity, sess, attn });
         }
     }
 
-    fn races_dir(&self) -> String {
-        format!("{}/{}/races", STATE_ROOT, self.session)
+    fn chars_dir(&self) -> String {
+        format!("{}/{}/characters", STATE_ROOT, self.session)
     }
 
-    fn read_races(&mut self) {
-        self.races.clear();
+    fn read_chars(&mut self) {
+        self.tab_chars.clear();
         if self.session.is_empty() {
             return;
         }
-        let Ok(rd) = std::fs::read_dir(self.races_dir()) else { return };
+        let Ok(rd) = std::fs::read_dir(self.chars_dir()) else { return };
         for e in rd.flatten() {
             let Ok(id) = e.file_name().to_string_lossy().parse::<usize>() else { continue };
             if let Ok(r) = std::fs::read_to_string(e.path()) {
                 let r = r.trim().to_string();
-                if valid_race(&r) {
-                    self.races.insert(id, r);
+                if valid_char(&r) {
+                    self.tab_chars.insert(id, r);
                 }
             }
         }
     }
 
-    fn set_race(&mut self, tab_id: usize, race: &str, overwrite: bool) -> bool {
-        let dir = self.races_dir();
+    fn set_char(&mut self, tab_id: usize, character: &str, overwrite: bool) -> bool {
+        let dir = self.chars_dir();
         let _ = std::fs::create_dir_all(&dir);
         let path = format!("{}/{}", dir, tab_id);
         let ok = if overwrite {
-            std::fs::write(&path, race).is_ok()
+            std::fs::write(&path, character).is_ok()
         } else {
             use std::io::Write;
             std::fs::OpenOptions::new()
                 .write(true)
                 .create_new(true)
                 .open(&path)
-                .and_then(|mut f| f.write_all(race.as_bytes()))
+                .and_then(|mut f| f.write_all(character.as_bytes()))
                 .is_ok()
         };
         if ok {
-            self.races.insert(tab_id, race.to_string());
+            self.tab_chars.insert(tab_id, character.to_string());
         }
         ok
     }
 
-    // Groups that may be assigned: the `races` option, else the sounds_dir folders that contain audio.
-    // With a library present, a group without clips is never assigned. With no library at all the
-    // option (or the built-in four) is used so the icons still work and the sound falls back to the ding.
-    fn effective_races(&self) -> Vec<String> {
-        // pool = the `races` option, else every group of the sounds library plus every group that has
-        // an icon (all of them, so races stay unique for as long as possible: 7 icon groups)
-        let mut pool: Vec<String> = if !self.races_opt.is_empty() {
-            self.races_opt.clone()
-        } else {
-            let mut v = self.scanned.clone();
-            for r in RACES.iter().filter(|r| r.3.is_some()) {
-                if !v.iter().any(|x| x == r.0) {
-                    v.push(r.0.to_string());
-                }
+    fn def_of(&self, name: &str) -> Option<&CharDef> {
+        self.defs.iter().find(|d| d.name == name)
+    }
+
+    // Library characters (race, name): the scan result resolved against characters.tsv. The scan reports
+    // the filename part before the first " - ", which is a prefix of the full name for the few
+    // characters whose name contains " - " ("Trollí čarodějnice - lékařka"); unknown names stay as they are.
+    fn resolve_scan(&self, raw: &[(String, String)]) -> Vec<(String, String)> {
+        let mut out: Vec<(String, String)> = Vec::new();
+        for (race, pre) in raw {
+            let full = format!("{} - ", pre);
+            let mut hit = false;
+            for d in self.defs.iter().filter(|d| d.race == *race && (d.name == *pre || d.name.starts_with(&full))) {
+                hit = true;
+                out.push((d.race.clone(), d.name.clone()));
             }
-            v
+            if !hit {
+                out.push((race.clone(), pre.clone()));
+            }
+        }
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    // Characters that may be assigned: the `characters` option, else every character that has clips
+    // (the scanned library; before the first scan or with no library: all of characters.tsv, the sound
+    // then falls back to the ding), narrowed by the `races` option.
+    fn effective_chars(&self) -> Vec<String> {
+        let mut pool: Vec<String> = if !self.chars_opt.is_empty() {
+            self.chars_opt.clone()
+        } else if !self.scanned.is_empty() {
+            self.scanned.iter().map(|c| c.1.clone()).collect()
+        } else {
+            self.defs.iter().map(|d| d.name.clone()).collect()
         };
+        if !self.races_opt.is_empty() {
+            pool.retain(|n| self.race_of(n).map_or(false, |r| self.races_opt.contains(&r)));
+        }
+        pool.sort();
         pool.dedup();
         pool
+    }
+
+    fn race_of(&self, name: &str) -> Option<String> {
+        self.def_of(name)
+            .map(|d| d.race.clone())
+            .or_else(|| self.scanned.iter().find(|c| c.1 == name).map(|c| c.0.clone()))
+    }
+
+    // glyph, accent colour, and whether the glyph needs a padding cell for a character
+    fn char_style(&self, name: &str, font: bool, mac: bool) -> (String, (u8, u8, u8)) {
+        let def = self.def_of(name);
+        let race = def.map(|d| d.race.clone()).or_else(|| self.race_of(name)).unwrap_or_default();
+        let (race_glyph, race_rgb) = race_style(&race, font, mac);
+        let glyph = match def.and_then(|d| d.glyph) {
+            Some(g) if font => g.to_string(),
+            _ => race_glyph,
+        };
+        (glyph, character_accent(race_rgb, name, def.map(|d| (d.ord, d.of))))
     }
 
     // wasm cannot call uname: ask once (retry every 5 s until answered)
@@ -325,7 +569,47 @@ impl State {
     }
 
     fn race_font_on(&self) -> bool {
-        self.race_font_opt.unwrap_or(self.os == "Linux")
+        self.race_font_opt.unwrap_or(self.font_flag)
+    }
+
+    // Package dir and font flag from the state root (written by claude-hook.sh); cheap, every tick.
+    // A new package dir re-derives phrase_script and triggers a library scan at once (no restart needed).
+    fn refresh_paths(&mut self) -> bool {
+        let file = std::fs::read_to_string(format!("{}/pkgdir", STATE_ROOT))
+            .ok()
+            .map(|v| v.trim_end_matches(&['\n', '\r'][..]).trim_end_matches('/').to_string())
+            .filter(|v| v.starts_with('/') && !v.chars().any(|c| c.is_control()));
+        let pkg = self.pkg_opt.clone().or(file).unwrap_or_else(|| DEFAULT_PACKAGE_DIR.to_string());
+        let mut changed = false;
+        if pkg != self.pkg_dir {
+            eprintln!("claude-tabs: package dir {}", pkg);
+            self.pkg_dir = pkg;
+            if self.phrase_opt.is_none() {
+                self.phrase_script = format!("{}/play-phrase.sh", self.pkg_dir);
+            }
+            self.scan_asked = 0; // scan the new location now
+            changed = true;
+        }
+        let font = std::fs::read_to_string(format!("{}/font", STATE_ROOT)).map_or(false, |v| v.trim() == "1");
+        if font != self.font_flag {
+            self.font_flag = font;
+            changed = true;
+        }
+        changed
+    }
+
+    // badges for every known name: characters.tsv first (stable), then other names (option, library)
+    fn rebuild_badges(&mut self) {
+        let mut names: Vec<String> = self.defs.iter().map(|d| d.name.clone()).collect();
+        names.extend(self.chars_opt.iter().cloned());
+        let mut extra: Vec<String> = self.scanned.iter().map(|c| c.1.clone()).collect();
+        extra.sort();
+        names.extend(extra);
+        self.badges = badge_table(&names);
+    }
+
+    fn badge_of(&self, name: &str) -> String {
+        self.badges.get(name).cloned().unwrap_or_else(|| badge_candidates(name)[0].clone())
     }
 
     // lazily (re)scan <sounds_dir> through the shell: wasm cannot read $HOME
@@ -338,14 +622,25 @@ impl State {
             return;
         }
         self.scan_asked = now;
-        let ctx = BTreeMap::from([("k".to_string(), "scan".to_string())]);
-        let cmd = format!(
-            "\"{}\" --list \"{}\" \"{}\"",
-            expand_home(&self.phrase_script),
-            expand_home(&self.sounds_dir),
-            expand_home(&self.player)
+        let ctx = BTreeMap::from([("k".to_string(), "scan".to_string()), ("p".to_string(), self.phrase_script.clone())]);
+        // exit 99 = no play-phrase.sh there (yet): no hook has written pkgdir, or it moved
+        run_command(
+            &[
+                "sh",
+                "-c",
+                concat!(
+                    "p=$1; d=$2; pl=$3; ",
+                    "case $p in '~/'*) p=$HOME/${p#'~/'};; esac; case $d in '~'|'~/'*) d=$HOME${d#'~'};; esac; ",
+                    "case $pl in '~/'*) pl=$HOME/${pl#'~/'};; esac; ",
+                    "[ -f \"$p\" ] || exit 99; exec sh \"$p\" --list \"$d\" \"$pl\""
+                ),
+                "_",
+                &self.phrase_script,
+                &self.sounds_dir,
+                &self.player,
+            ],
+            ctx,
         );
-        run_command(&["sh", "-c", &cmd], ctx);
     }
 
     // Give every tab that runs Claude a race, preferring races no other tab has. The first writer wins
@@ -353,32 +648,36 @@ impl State {
     // Only the leader (lowest plugin id) assigns, from a fresh snapshot, so two tabs can never be
     // handed the same race by concurrent instances. Least-used race first, random among ties; an
     // assignment is permanent (file per tab id) until the tab closes.
-    fn assign_races(&mut self) {
-        let allowed = self.effective_races();
+    fn assign_chars(&mut self) {
+        // wait for the first library scan so the pool is the characters that have clips
+        if !self.scan_done && self.perms && !self.phrase_script.is_empty() && self.chars_opt.is_empty() {
+            return;
+        }
+        let allowed = self.effective_chars();
         if allowed.is_empty() || self.session.is_empty() {
             return;
         }
         let mut tabs: Vec<(usize, usize)> = self.tabs.iter().map(|t| (t.tab_id, t.position)).collect();
         tabs.sort_by_key(|t| t.1);
         for (id, pos) in tabs {
-            if self.races.contains_key(&id) || (!self.race_all_tabs && self.tab_claude(pos).is_none()) {
+            if self.tab_chars.contains_key(&id) || (!self.race_all_tabs && self.tab_claude(pos).is_none()) {
                 continue;
             }
             let live: HashSet<usize> = self.tabs.iter().map(|t| t.tab_id).collect();
-            let count = |r: &String| self.races.iter().filter(|(k, v)| live.contains(k) && *v == r).count();
+            let count = |r: &String| self.tab_chars.iter().filter(|(k, v)| live.contains(k) && *v == r).count();
             let min = allowed.iter().map(|r| count(r)).min().unwrap_or(0);
             let mut cands: Vec<&String> = allowed.iter().filter(|r| count(r) == min).collect();
-            // among equally used groups prefer those that have sound clips
-            if cands.iter().any(|r| self.scanned.contains(r)) {
-                cands.retain(|r| self.scanned.contains(r));
+            // among equally used characters prefer those that have sound clips
+            if cands.iter().any(|r| self.scanned.iter().any(|c| &c.1 == *r)) {
+                cands.retain(|r| self.scanned.iter().any(|c| &c.1 == *r));
             }
             let nanos = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |d| d.subsec_nanos() as usize);
             let pick = cands[nanos % cands.len()].clone();
             eprintln!("claude-tabs: tab {} -> {}", id, pick);
-            if !self.set_race(id, &pick, false) {
-                self.read_races(); // already assigned elsewhere
+            if !self.set_char(id, &pick, false) {
+                self.read_chars(); // already assigned elsewhere
             }
         }
     }
@@ -392,7 +691,7 @@ impl State {
         let ok = self.fetch_snapshot();
         if ok && self.is_leader() {
             self.cleanup_stale();
-            self.assign_races();
+            self.assign_chars();
         }
     }
 
@@ -400,6 +699,9 @@ impl State {
     // `Working` while subagents run and for `subagent_grace_s` after the last one stopped (the main agent
     // is normally woken and ends with a Stop of its own); only then it counts as finished.
     fn eff_state(&self, pane: u32, f: &PaneState) -> St {
+        if f.attn.is_some() {
+            return St::Attn; // beats the working hold, subagent counts and the grace timer
+        }
         if f.subs > 0 || (f.recent_activity && f.st != St::Working && !(f.st == St::Done && f.deferred)) {
             return St::Working;
         }
@@ -432,6 +734,7 @@ impl State {
         let mut best: Option<(St, u128)> = None;
         let mut count = 0usize;
         let rank = |s: St| match s {
+            St::Attn => 3,
             St::Working => 2,
             St::Done => 1,
             St::Idle => 0,
@@ -439,7 +742,7 @@ impl State {
         for p in panes.iter().filter(|p| !p.is_plugin) {
             let cand = if let Some(f) = self.files.get(&p.id) {
                 count += f.subs;
-                Some((self.eff_state(p.id, f), f.ns))
+                Some((self.eff_state(p.id, f), f.attn.map_or(f.ns, |a| a.0)))
             } else if self.show_icon_fallback && looks_like_claude(p) {
                 Some((St::Idle, 0))
             } else {
@@ -484,6 +787,10 @@ impl State {
             .iter()
             .any(|(p, f)| self.eff_state(*p, f) == St::Done && self.reacted.get(p).map_or(true, |n| *n != f.ns));
         let any_done = self.files.iter().any(|(p, f)| self.eff_state(*p, f) == St::Done);
+        let any_attn = self.files.values().any(|f| f.attn.is_some());
+        let new_attn = self.files.iter().any(|(p, f)| f.attn.map_or(false, |a| self.attn_due(*p, a.0)));
+        let new_done = new_done || new_attn;
+        let any_done = any_done || any_attn;
         if !new_done && !any_done {
             return;
         }
@@ -503,7 +810,26 @@ impl State {
         let mut react: Vec<(u32, usize)> = Vec::new();
         let mut ack: Vec<(u32, u128)> = Vec::new();
         let mut need_os = false;
+        let mut react_attn: Vec<(u32, usize)> = Vec::new();
+        let mut ack_attn: Vec<(u32, u128)> = Vec::new();
         for (pane, f) in self.files.iter() {
+            if let Some((ans, aaway)) = f.attn {
+                let tab = self.pane_tab(*pane);
+                if self.attn_due(*pane, ans) {
+                    if let Some(t) = tab {
+                        react_attn.push((*pane, t));
+                    }
+                }
+                if tab.is_some() && tab == active {
+                    // asked while the user was in another window: stays until the terminal has the OS focus
+                    if self.ding_when_os_unfocused && aaway && self.os_focus_ms < (ans / 1_000_000) as u64 {
+                        need_os = true;
+                    } else {
+                        ack_attn.push((*pane, ans));
+                    }
+                }
+                continue;
+            }
             if self.eff_state(*pane, f) != St::Done {
                 continue;
             }
@@ -529,14 +855,34 @@ impl State {
         for (pane, tab) in react {
             let ns = self.files[&pane].ns;
             let away = self.files[&pane].away;
+            let quiet = self.files[&pane].quiet;
             self.reacted.insert(pane, ns);
+            if quiet {
+                continue;
+            }
             let focused = Some(tab) == active;
             if !focused || self.ding_when_focused || (self.ding_when_os_unfocused && away) {
-                let race = self.tabs.iter().find(|t| t.position == tab).and_then(|t| self.races.get(&t.tab_id)).cloned();
+                let race = self.tabs.iter().find(|t| t.position == tab).and_then(|t| self.tab_chars.get(&t.tab_id)).cloned();
                 self.ding(race.as_deref());
             }
             if self.auto_switch && !focused {
                 switch_tab_to(tab as u32 + 1);
+            }
+        }
+        let now = now_secs();
+        for (pane, tab) in react_attn {
+            let (ns, away) = self.files[&pane].attn.unwrap_or((0, false));
+            self.attn_reacted.insert(pane, (ns, now));
+            if Some(tab) != active || self.ding_when_focused || (self.ding_when_os_unfocused && away) {
+                let ch = self.tabs.iter().find(|t| t.position == tab).and_then(|t| self.tab_chars.get(&t.tab_id)).cloned();
+                self.ding(ch.as_deref());
+            }
+        }
+        // an attention request on the tab in view counts as seen (the question is on screen): drop the overlay
+        for (pane, ns) in ack_attn {
+            let path = format!("{}/{}/{}.attn", STATE_ROOT, self.session, pane);
+            if std::fs::read_to_string(&path).unwrap_or_default().contains(&ns.to_string()) {
+                let _ = std::fs::remove_file(&path);
             }
         }
         // a finished tab that is now in view counts as seen: Done -> Idle (shared through the file)
@@ -547,6 +893,15 @@ impl State {
                 let _ = std::fs::write(format!("{}.tmp", path), format!("idle {}\n", ns));
                 let _ = std::fs::rename(format!("{}.tmp", path), &path);
             }
+        }
+    }
+
+    // a new attention request (or, with attention_repeat_s, a repeat of one that is still unanswered)
+    fn attn_due(&self, pane: u32, ns: u128) -> bool {
+        match self.attn_reacted.get(&pane) {
+            Some((n, _)) if *n != ns => true,
+            Some((_, at)) => self.attention_repeat_s > 0 && now_secs().saturating_sub(*at) >= self.attention_repeat_s,
+            None => true,
         }
     }
 
@@ -586,6 +941,9 @@ impl State {
     fn prime(&mut self) {
         for (pane, f) in self.files.iter() {
             self.reacted.insert(*pane, f.ns);
+            if let Some((ns, _)) = f.attn {
+                self.attn_reacted.insert(*pane, (ns, now_secs()));
+            }
         }
         self.primed = true;
     }
@@ -599,16 +957,27 @@ impl State {
         let live: HashSet<u32> = m.panes.values().flatten().filter(|p| !p.is_plugin).map(|p| p.id).collect();
         let dead: Vec<u32> = self.files.keys().filter(|k| !live.contains(k)).cloned().collect();
         let live_tabs: HashSet<usize> = self.tabs.iter().map(|t| t.tab_id).collect();
-        let stale_races: Vec<usize> = self.races.keys().filter(|k| !live_tabs.contains(k)).cloned().collect();
+        let stale_races: Vec<usize> = self.tab_chars.keys().filter(|k| !live_tabs.contains(k)).cloned().collect();
         for k in stale_races {
-            let _ = std::fs::remove_file(format!("{}/{}", self.races_dir(), k));
-            self.races.remove(&k);
+            let _ = std::fs::remove_file(format!("{}/{}", self.chars_dir(), k));
+            self.tab_chars.remove(&k);
         }
         for k in dead {
             let dir = format!("{}/{}", STATE_ROOT, self.session);
             let _ = std::fs::remove_file(format!("{}/{}", dir, k));
             let _ = std::fs::remove_dir_all(format!("{}/{}.sub", dir, k));
             let _ = std::fs::remove_file(format!("{}/{}.ev", dir, k));
+            let _ = std::fs::remove_file(format!("{}/{}.attn", dir, k));
+            let _ = std::fs::remove_file(format!("{}/{}.sess", dir, k));
+            // the hook's duplicate-event markers <pane>.once.<key>
+            if let Ok(rd) = std::fs::read_dir(&dir) {
+                let pre = format!("{}.once.", k);
+                for e in rd.flatten() {
+                    if e.file_name().to_string_lossy().starts_with(&pre) {
+                        let _ = std::fs::remove_dir(e.path());
+                    }
+                }
+            }
             self.files.remove(&k);
         }
     }
@@ -731,26 +1100,36 @@ impl State {
         t.name.clone()
     }
 
-    // Play a random clip for the race (play-phrase.sh); fall back to ding_command when there is none.
-    fn ding(&self, race: Option<&str>) {
+    // Play a random clip of the character (play-phrase.sh); fall back to ding_command when there is none.
+    fn ding(&self, character: Option<&str>) {
         if !self.perms {
             return;
         }
         let ctx = BTreeMap::from([("k".to_string(), "ding".to_string())]);
-        let default_ding = format!("\"{}\" --ding \"{}\"", expand_home(&self.phrase_script), expand_home(&self.player));
-        let fallback = if self.ding_command.is_empty() {
-            if self.phrase_script.is_empty() { "true" } else { default_ding.as_str() }
-        } else {
-            self.ding_command.as_str()
-        };
-        let cmd = match race {
-            Some(r) if !self.phrase_script.is_empty() && valid_race(r) => {
-                let q = |v: &str| format!("\"{}\"", expand_home(v));
-                format!("{} {} {} {} || {{ {}; }}", q(&self.phrase_script), q(&self.sounds_dir), r, q(&self.player), fallback)
-            }
-            _ => fallback.to_string(),
-        };
-        run_command(&["sh", "-c", &cmd], ctx);
+        // a clip of the character (play-phrase.sh); else ding_command; else the packaged ding.wav. A missing
+        // play-phrase.sh (no hook has told us the package dir yet) is skipped silently.
+        let ch = character.filter(|c| valid_char(c)).unwrap_or("");
+        run_command(
+            &[
+                "sh",
+                "-c",
+                concat!(
+                    "p=$1; d=$2; c=$3; pl=$4; dc=$5; ",
+                    "case $p in '~/'*) p=$HOME/${p#'~/'};; esac; case $d in '~'|'~/'*) d=$HOME${d#'~'};; esac; ",
+                    "case $pl in '~/'*) pl=$HOME/${pl#'~/'};; esac; ",
+                    "if [ -n \"$c\" ] && [ -n \"$p\" ] && [ -f \"$p\" ]; then sh \"$p\" \"$d\" \"$c\" \"$pl\" && exit 0; fi; ",
+                    "if [ -n \"$dc\" ]; then eval \"$dc\"; exit $?; fi; ",
+                    "if [ -n \"$p\" ] && [ -f \"$p\" ]; then exec sh \"$p\" --ding \"$pl\"; fi; exit 0"
+                ),
+                "_",
+                &self.phrase_script,
+                &self.sounds_dir,
+                ch,
+                &self.player,
+                &self.ding_command,
+            ],
+            ctx,
+        );
     }
 }
 
@@ -793,14 +1172,6 @@ fn blend(rgb: (u8, u8, u8), theme: PaletteColor) -> PaletteColor {
     }
 }
 
-fn expand_home(v: &str) -> String {
-    // resolved by the shell: ~ becomes $HOME (inside double quotes only $HOME works)
-    match v.strip_prefix('~') {
-        Some(rest) => format!("$HOME{}", rest),
-        None => v.to_string(),
-    }
-}
-
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -825,6 +1196,8 @@ impl ZellijPlugin for State {
         self.ding_command = cfg.get("ding_command").cloned().unwrap_or_default();
         self.ding_when_focused = truthy(cfg.get("ding_when_focused"), false);
         self.ding_when_os_unfocused = truthy(cfg.get("ding_when_os_unfocused"), true);
+        self.attention = truthy(cfg.get("attention"), true);
+        self.attention_repeat_s = cfg.get("attention_repeat_s").and_then(|v| v.parse().ok()).unwrap_or(0);
         self.auto_switch = truthy(cfg.get("auto_switch"), false);
         self.show_icon_fallback = truthy(cfg.get("title_fallback"), true);
         self.auto_name = truthy(cfg.get("auto_name"), true);
@@ -833,6 +1206,7 @@ impl ZellijPlugin for State {
         self.race_icons = truthy(cfg.get("race_icons"), true);
         self.race_tab_colors = truthy(cfg.get("race_tab_colors"), true);
         self.show_other_clients = truthy(cfg.get("show_other_clients"), false);
+        // auto (default) = the colour font iff claude-hook.sh found "WC3 Icons" installed (<state root>/font)
         self.race_font_opt = match cfg.get("race_font").map(|v| v.as_str()) {
             Some("true") | Some("1") | Some("yes") | Some("on") => Some(true),
             Some("false") | Some("0") | Some("no") | Some("off") => Some(false),
@@ -857,11 +1231,22 @@ impl ZellijPlugin for State {
             .get("races")
             .map(|v| v.split(|c: char| c == ',' || c.is_whitespace()).filter(|x| valid_race(x)).map(String::from).collect::<Vec<_>>())
             .unwrap_or_default();
+        // names contain spaces: comma separated
+        self.chars_opt = cfg
+            .get("characters")
+            .map(|v| v.split(',').map(|x| x.trim().to_string()).filter(|x| valid_char(x)).collect::<Vec<_>>())
+            .unwrap_or_default();
+        self.defs = parse_characters(CHARACTERS_TSV);
+        self.rebuild_badges();
         self.sounds_dir = cfg.get("sounds_dir").cloned().unwrap_or_else(|| DEFAULT_SOUNDS_DIR.to_string());
-        let pkg = cfg.get("package_dir").map(|v| v.trim_end_matches('/').to_string()).filter(|v| !v.is_empty());
-        let pkg = pkg.unwrap_or_else(|| DEFAULT_PACKAGE_DIR.to_string());
-        // an explicit empty phrase_script disables clips (only ding_command); unset = <package_dir>/play-phrase.sh
-        self.phrase_script = cfg.get("phrase_script").cloned().unwrap_or_else(|| format!("{}/play-phrase.sh", pkg));
+        // empty/unset package_dir = the dir claude-hook.sh reports (<state root>/pkgdir), else the legacy default
+        self.pkg_opt = cfg.get("package_dir").map(|v| v.trim().trim_end_matches('/').to_string()).filter(|v| !v.is_empty());
+        // an explicit empty phrase_script disables clips (only ding_command); unset = <package dir>/play-phrase.sh
+        self.phrase_opt = cfg.get("phrase_script").cloned();
+        if let Some(p) = &self.phrase_opt {
+            self.phrase_script = p.clone();
+        }
+        self.refresh_paths();
         self.player = cfg.get("player").cloned().unwrap_or_default(); // empty = autodetect in play-phrase.sh
         self.my_id = get_plugin_ids().plugin_id;
         set_selectable(false);
@@ -947,8 +1332,13 @@ impl ZellijPlugin for State {
                         next = next.min(to_boundary.max(30) as f64 / 1000.0);
                     }
                 }
+                // the leader decides about dings from these lists too, whichever tab it sits in
+                if self.is_leader() {
+                    self.ask_agents();
+                }
                 self.last_next_ms = (next * 1000.0) as u64;
                 set_timeout(next);
+                self.refresh_paths();
                 self.ask_tz();
                 self.ask_scan();
                 self.ask_os();
@@ -1003,6 +1393,7 @@ impl ZellijPlugin for State {
                                 .filter(|l| !l.is_empty())
                                 .collect();
                             v.sort();
+                            self.task_at.insert(pane, now_secs());
                             if self.task_running.get(&pane) != Some(&v) {
                                 self.task_running.insert(pane, v);
                                 redraw = true;
@@ -1020,17 +1411,36 @@ impl ZellijPlugin for State {
                         redraw = o != self.os;
                         self.os = o;
                     }
+                    Some("scan") if code == Some(99) => {
+                        // no play-phrase.sh at the package dir (yet): assign from characters.tsv meanwhile
+                        // and look again in 5 s (a hook writes pkgdir on its next event)
+                        let p = ctx.get("p").cloned().unwrap_or_default();
+                        if p != self.pkg_missing {
+                            eprintln!("claude-tabs: no {} yet (waiting for a Claude Code hook to report the package dir)", p);
+                            self.pkg_missing = p;
+                        }
+                        self.scan_done = true;
+                        self.scan_asked = now_secs().saturating_sub(25);
+                    }
                     Some("scan") => {
-                        let mut v: Vec<String> = String::from_utf8_lossy(&out)
+                        self.pkg_missing.clear();
+                        // lines "race<TAB>character-prefix" (play-phrase.sh --list)
+                        let raw: Vec<(String, String)> = String::from_utf8_lossy(&out)
                             .lines()
-                            .map(|l| l.trim().to_string())
-                            .filter(|l| valid_race(l) && !l.starts_with('_')) // `_excluded` etc. are not races
+                            .filter_map(|l| {
+                                let (r, c) = l.split_once('\t')?;
+                                let (r, c) = (r.trim(), c.trim());
+                                (valid_race(r) && !r.starts_with('_') && valid_char(c)).then(|| (r.to_string(), c.to_string()))
+                            })
                             .collect();
-                        v.sort();
-                        eprintln!("claude-tabs: scan found {:?}", v);
+                        let v = self.resolve_scan(&raw);
+                        eprintln!("claude-tabs: scan found {} characters", v.len());
                         redraw = v != self.scanned;
                         self.scanned = v;
                         self.scan_done = true;
+                        if redraw {
+                            self.rebuild_badges();
+                        }
                     }
                     Some("ding") if code != Some(0) => {
                         eprintln!("claude-tabs: ding_command failed ({:?}): {}", code, String::from_utf8_lossy(&err));
@@ -1063,42 +1473,56 @@ impl ZellijPlugin for State {
             unblock_cli_pipe_input(id);
         }
         if msg.name == "claude_ding" {
-            // manual test: payload = race / group name, or `active` for the active tab's race.
+            // manual test: payload = character name, or `active` for the active tab's character.
             // `zellij pipe` also sends an empty message at stdin EOF: ignore it.
             if msg.payload.as_deref().map_or(true, |p| p.trim().is_empty()) {
                 return false;
             }
             if self.fetch_snapshot() && self.is_leader() {
-                // payload = race name; empty = the active tab's race
-                let given = msg.payload.as_deref().map(str::trim).filter(|r| valid_race(r)).map(String::from);
-                let race = given.or_else(|| {
+                let given = msg.payload.as_deref().map(str::trim).filter(|r| *r != "active" && valid_char(r)).map(String::from);
+                let ch = given.or_else(|| {
                     let t = self.tabs.iter().find(|t| t.active)?;
-                    self.races.get(&t.tab_id).cloned()
+                    self.tab_chars.get(&t.tab_id).cloned()
                 });
-                self.ding(race.as_deref());
+                self.ding(ch.as_deref());
             }
             return false;
         }
         if msg.name == "claude_reshuffle" {
             // `claude-ctl.sh reshuffle`: forget all assignments and hand them out again (unique first)
             if msg.payload.as_deref().map_or(false, |p| p.trim() == "now") && self.fetch_snapshot() && self.is_leader() {
-                if let Ok(rd) = std::fs::read_dir(self.races_dir()) {
+                if let Ok(rd) = std::fs::read_dir(self.chars_dir()) {
                     for e in rd.flatten() {
                         let _ = std::fs::remove_file(e.path());
                     }
                 }
-                self.races.clear();
-                self.assign_races();
+                self.tab_chars.clear();
+                self.assign_chars();
             }
             return true;
         }
-        if msg.name == "claude_race" {
-            // `zellij pipe --name claude_race -- orc` sets the race of the active tab
+        if msg.name == "claude_character" || msg.name == "claude_race" {
+            // `zellij pipe --name claude_character -- "Arthas Menethill"` sets the character of the active tab;
+            // claude_race with a race name picks that race's least-used character instead
             let r = msg.payload.as_deref().map(str::trim).unwrap_or("");
-            if valid_race(r) && self.fetch_snapshot() {
-                self.read_races();
-                if let Some(id) = self.tabs.iter().find(|t| t.active).map(|t| t.tab_id) {
-                    self.set_race(id, r, true);
+            if valid_char(r) && self.fetch_snapshot() {
+                self.read_chars();
+                let chosen = if msg.name == "claude_character" {
+                    Some(r.to_string())
+                } else {
+                    let live: HashSet<usize> = self.tabs.iter().map(|t| t.tab_id).collect();
+                    let count = |n: &String| self.tab_chars.iter().filter(|(k, v)| live.contains(k) && *v == n).count();
+                    let mut c: Vec<String> = self.effective_chars().into_iter().filter(|n| self.race_of(n).as_deref() == Some(r)).collect();
+                    if c.is_empty() {
+                        c = self.defs.iter().filter(|d| d.race == r).map(|d| d.name.clone()).collect();
+                    }
+                    let min = c.iter().map(|n| count(n)).min().unwrap_or(0);
+                    c.retain(|n| count(n) == min);
+                    let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.subsec_nanos() as usize);
+                    if c.is_empty() { None } else { Some(c[nanos % c.len()].clone()) }
+                };
+                if let (Some(ch), Some(id)) = (chosen, self.tabs.iter().find(|t| t.active).map(|t| t.tab_id)) {
+                    self.set_char(id, &ch, true);
                 }
             }
             return true;
@@ -1159,7 +1583,7 @@ impl State {
             return None;
         }
         let (st, ns, _) = self.tab_claude(t.position)?;
-        if st != St::Done {
+        if st != St::Done && st != St::Attn {
             return None;
         }
         let age_s = now_secs().saturating_sub((ns / 1_000_000_000) as u64);
@@ -1180,7 +1604,10 @@ impl State {
         let Some(m) = self.manifest.as_ref() else { return false };
         let Some(panes) = m.panes.get(&pos) else { return false };
         panes.iter().filter(|p| !p.is_plugin).any(|p| {
-            self.files.get(&p.id).map_or(false, |f| f.away && self.eff_state(p.id, f) == St::Done)
+            self.files.get(&p.id).map_or(false, |f| match f.attn {
+                Some((_, a)) => a,
+                None => f.away && self.eff_state(p.id, f) == St::Done,
+            })
         })
     }
 
@@ -1205,7 +1632,7 @@ impl State {
         let ctx = BTreeMap::from([("k".to_string(), "osfocus".to_string())]);
         let script = self.sibling_script("os-focus.sh");
         run_command(
-            &["sh", "-c", "s=$1; case $s in '~/'*) s=$HOME/${s#'~/'};; esac; exec \"$s\" \"$2\"", "_", &script, &self.session],
+            &["sh", "-c", "s=$1; case $s in '~/'*) s=$HOME/${s#'~/'};; esac; [ -f \"$s\" ] || exit 0; exec sh \"$s\" \"$2\"", "_", &script, &self.session],
             ctx,
         );
     }
@@ -1260,7 +1687,7 @@ impl State {
             if let Some(dir) = &f.sess {
                 let ctx = BTreeMap::from([("k".to_string(), "agents".to_string()), ("pane".to_string(), pane.to_string())]);
                 run_command(
-                    &["sh", "-c", "s=$1; case $s in '~/'*) s=$HOME/${s#'~/'};; esac; exec \"$s\" \"$2\"", "_", &script, dir],
+                    &["sh", "-c", "s=$1; case $s in '~/'*) s=$HOME/${s#'~/'};; esac; [ -f \"$s\" ] || exit 0; exec sh \"$s\" \"$2\"", "_", &script, dir],
                     ctx,
                 );
             }
@@ -1319,10 +1746,16 @@ impl State {
             }
             let ribbon = if t.active { colors.ribbon_selected } else { colors.ribbon_unselected };
             let claude = self.tab_claude(t.position);
-            let icon = claude.or(if self.race_all_tabs && self.races.contains_key(&t.tab_id) { Some((St::Idle, 0, 0)) } else { None }).map(|(st, _ns, count)| {
+            let icon = claude.or(if self.race_all_tabs && self.tab_chars.contains_key(&t.tab_id) { Some((St::Idle, 0, 0)) } else { None }).map(|(st, _ns, count)| {
                 let is_claude = claude.is_some();
                 let mut glyph = if is_claude {
-                    if self.spinner && st == St::Working { SPIN[self.spin_frame()].to_string() } else { ICON.to_string() }
+                    if self.spinner && st == St::Working {
+                        SPIN[self.spin_frame()].to_string()
+                    } else if st == St::Attn {
+                        "?".to_string()
+                    } else {
+                        ICON.to_string()
+                    }
                 } else {
                     String::new()
                 };
@@ -1332,27 +1765,32 @@ impl State {
                 let color = match st {
                     St::Working => ribbon.emphasis_0,
                     St::Done => ribbon.emphasis_2,
+                    St::Attn => ribbon.emphasis_3,
                     St::Idle => ribbon.base,
                 };
+                // colour icon font: the character's glyph; otherwise a 2-cell initials badge (any terminal)
+                let font = self.race_font_on();
                 let race = if self.race_icons {
-                    self.races.get(&t.tab_id).map(|r| {
-                        let (g, rgb) = race_style(r, self.race_font_on(), self.os == "Darwin");
-                        (g, blend(rgb, ribbon.base))
+                    self.tab_chars.get(&t.tab_id).map(|r| {
+                        let (g, rgb) = self.char_style(r, font, self.os == "Darwin");
+                        (if font { g } else { self.badge_of(r) }, blend(rgb, ribbon.base))
                     })
                 } else {
                     None
                 };
+                let badge = race.is_some() && !font;
                 let state = match st {
                     St::Working => IconState::Working,
                     St::Done => IconState::Done,
+                    St::Attn => IconState::Attn,
                     St::Idle => IconState::Idle,
                 };
                 let tint = if self.race_tab_colors && race.is_some() {
-                    self.races.get(&t.tab_id).map(|r| race_style(r, false, false).1)
+                    self.tab_chars.get(&t.tab_id).map(|r| self.char_style(r, false, false).1)
                 } else {
                     None
                 };
-                Icon { glyph, color, race, state, tint, dim: self.race_dim, blink: self.tab_blink(t), underline: self.active_underline }
+                Icon { glyph, color, race, badge, state, tint, dim: self.race_dim, blink: self.tab_blink(t), underline: self.active_underline }
             });
             all.push(tab_style(name, icon, t, alt, colors, self.mode_info.capabilities, dimmed, self.show_other_clients));
             alt = !alt;
@@ -1367,6 +1805,7 @@ impl State {
 
     fn render_key(&self) -> String {
         let mut s = self.clock_text().unwrap_or_default();
+        s.push_str(if self.race_font_on() { "F1" } else { "F0" });
         if self.any_working() {
             s.push_str(&format!("S{}", self.spin_frame()));
         }
@@ -1377,7 +1816,7 @@ impl State {
         }
         for t in &self.tabs {
             s.push_str(&self.display_name(t));
-            if let Some(r) = self.races.get(&t.tab_id) {
+            if let Some(r) = self.tab_chars.get(&t.tab_id) {
                 s.push_str(r);
             }
             if let Some((st, ns, n)) = self.tab_claude(t.position) {
@@ -1387,5 +1826,37 @@ impl State {
             s.push('|');
         }
         s
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use unicode_width::UnicodeWidthStr;
+
+    // cargo test --target x86_64-unknown-linux-gnu -- --nocapture   (prints the badge table)
+    #[test]
+    fn badges_unique_two_cells() {
+        let defs = parse_characters(CHARACTERS_TSV);
+        let names: Vec<String> = defs.iter().map(|d| d.name.clone()).collect();
+        let t = badge_table(&names);
+        let mut seen: HashMap<String, String> = HashMap::new();
+        for d in &defs {
+            let b = &t[&d.name];
+            println!("{}\t{}\t{}", d.race, d.name, b);
+            assert_eq!(b.width(), 2, "{} -> {:?}", d.name, b);
+            assert_eq!(b.chars().count(), 2, "{} -> {:?}", d.name, b);
+            assert!(b.chars().all(|c| (c as u32) < 0x10000), "{} -> {:?}", d.name, b);
+            if let Some(o) = seen.insert(b.clone(), d.name.clone()) {
+                panic!("collision {} {} {}", b, o, d.name);
+            }
+        }
+        assert_eq!(seen.len(), defs.len());
+        assert_eq!(badge_candidates("Čarodějka")[0], "ČA");
+        assert_eq!(badge_candidates("Trollí čarodějnice - lékařka")[0], "TČ");
+        assert_eq!(badge_candidates("Arthas (Nemrtví)")[0], "AN");
+        assert_eq!(badge_candidates("X")[0], "X ");
+        assert_eq!(badge_candidates("42")[0], "42");
+        assert_eq!(badge_candidates("straße")[0], "ST");
     }
 }

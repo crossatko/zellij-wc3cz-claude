@@ -26,12 +26,15 @@ pub enum IconState {
     Idle,
     Working,
     Done, // finished and not yet seen
+    Attn, // Claude waits for an answer (permission / question)
 }
 
 pub struct Icon {
     pub glyph: String,
     pub color: PaletteColor,
     pub race: Option<(String, PaletteColor)>,
+    // race.0 is a 2-cell initials badge (no colour icon font): drawn as a coloured chip, flush left
+    pub badge: bool,
     pub state: IconState,
     // race accent: when set, the whole tab is tinted (dim when inactive, bright when active)
     pub tint: Option<(u8, u8, u8)>,
@@ -53,6 +56,13 @@ fn rel_lum(c: (u8, u8, u8)) -> f32 {
     0.2126 * f(c.0) + 0.7152 * f(c.1) + 0.0722 * f(c.2)
 }
 
+// Icon-font glyphs (race icons U+1F7E0..E6, character icons U+1FA70..U+1FAD6) are emoji codepoints: wide
+// (2 cells) for unicode-width and drawn as 2-cell colour bitmaps, so no extra padding is needed. Private-use
+// codepoints do not work: kitty draws them as 1-cell monochrome alpha masks.
+fn is_icon_font_char(c: char) -> bool {
+    ('\u{1F7E0}'..='\u{1F7E6}').contains(&c) || ('\u{1FA70}'..='\u{1FAFF}').contains(&c)
+}
+
 pub fn contrast(a: (u8, u8, u8), b: (u8, u8, u8)) -> f32 {
     let (x, y) = (rel_lum(a), rel_lum(b));
     (x.max(y) + 0.05) / (x.min(y) + 0.05)
@@ -63,11 +73,10 @@ pub fn contrast(a: (u8, u8, u8), b: (u8, u8, u8)) -> f32 {
 //  inactive = accent scaled to `dim` (default 0.4) of its brightness (same hue), with light text
 //             mixed toward the background until the contrast is just 4.5:1 (muted but readable)
 pub fn tint_colors(accent: (u8, u8, u8), active: bool, dim: f32) -> ((u8, u8, u8), (u8, u8, u8)) {
-    let (black, white) = ((0u8, 0u8, 0u8), (255u8, 255u8, 255u8));
+    let white = (255u8, 255u8, 255u8);
     if active {
         let bg = mix(accent, white, 0.15);
-        let fg = if contrast(bg, black) >= contrast(bg, white) { black } else { white };
-        return (bg, fg);
+        return (bg, best_text(bg));
     }
     let bg = mix((0, 0, 0), accent, dim);
     let (mut lo, mut hi) = (0.0f32, 1.0f32);
@@ -76,6 +85,20 @@ pub fn tint_colors(accent: (u8, u8, u8), active: bool, dim: f32) -> ((u8, u8, u8
         if contrast(bg, mix(bg, white, mid)) >= 4.5 { hi = mid } else { lo = mid }
     }
     (bg, mix(bg, white, hi))
+}
+
+fn best_text(bg: (u8, u8, u8)) -> (u8, u8, u8) {
+    let (black, white) = ((0u8, 0u8, 0u8), (255u8, 255u8, 255u8));
+    if contrast(bg, black) >= contrast(bg, white) { black } else { white }
+}
+
+// Initials badge (no icon font): a chip of the character's accent that stands out from the tab it sits on,
+// brighter than an inactive (dimmed) tab and darker than the active (bright) one; black or white text,
+// whichever contrasts more (>= 4.4:1 for every accent of the RACES table).
+pub fn badge_colors(accent: (u8, u8, u8), look_active: bool, dim: f32) -> ((u8, u8, u8), (u8, u8, u8)) {
+    let k = if look_active { 0.55 } else { (dim + 0.35).min(1.0) };
+    let bg = mix((0, 0, 0), accent, k);
+    (bg, best_text(bg))
 }
 
 pub fn render_tab(
@@ -144,10 +167,12 @@ pub fn render_tab(
         .as_ref()
         .map_or(0, |i| (if i.glyph.is_empty() { 0 } else { i.glyph.width() + 1 }) + i.race.as_ref().map_or(0, |r| r.0.width() + 1));
     // a colour-font race icon sits flush against the left edge of the ribbon: no leading padding space
-    let flush = icon
-        .as_ref()
-        .and_then(|i| i.race.as_ref())
-        .map_or(false, |r| r.0.chars().next().map_or(false, |c| ('\u{1F7E0}'..='\u{1F7E6}').contains(&c)));
+    // (so does the initials badge, which has the same 2-cell width)
+    let flush = icon.as_ref().map_or(false, |i| i.race.is_some() && i.badge)
+        || icon
+            .as_ref()
+            .and_then(|i| i.race.as_ref())
+            .map_or(false, |r| r.0.chars().next().map_or(false, |c| is_icon_font_char(c)));
     let mut tab_text_len = text.width() + icon_width + (separator_width * 2) + if flush { 1 } else { 2 }; // padding
 
     let tab_styled_text = if let Some(icon) = icon {
@@ -157,6 +182,7 @@ pub fn render_tab(
                 IconState::Idle => text_style,
                 IconState::Working => text_style.italic(),
                 IconState::Done => style!(background_color, foreground_color).bold(),
+                IconState::Attn => style!(background_color, foreground_color).bold().underline(),
             }
         } else {
             text_style.fg(match icon.color {
@@ -165,13 +191,27 @@ pub fn render_tab(
             })
         };
         let race_part = match icon.race {
+            Some((g, c)) if icon.badge && !dimmed => {
+                let (bg, fg) = match (icon.tint, tint) {
+                    (Some(acc), Some(_)) => badge_colors(acc, look_active, icon.dim),
+                    _ => {
+                        let rgb = match c {
+                            PaletteColor::Rgb(x) => x,
+                            PaletteColor::EightBit(_) => (128, 128, 128),
+                        };
+                        (rgb, best_text(rgb))
+                    }
+                };
+                format!("{}{}", style!(PaletteColor::Rgb(fg), PaletteColor::Rgb(bg)).bold().paint(g), text_style.paint(" "))
+            }
             Some((g, c)) => {
                 let c = if tint.is_some() { foreground_color } else { c };
                 let rc = match c {
                     PaletteColor::Rgb((r, g, b)) => ansi_term::Color::RGB(r, g, b),
                     PaletteColor::EightBit(c) => ansi_term::Color::Fixed(c),
                 };
-                format!("{}{}", text_style.fg(rc).paint(g), text_style.paint(" "))
+                let pad = " ";
+                format!("{}{}", text_style.fg(rc).paint(g), text_style.paint(pad))
             }
             None => String::new(),
         };

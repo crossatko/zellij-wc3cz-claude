@@ -20,7 +20,14 @@
 # Limits: several windows of one terminal process (kitty, wezterm, Terminal.app, iTerm2) share a pid:
 # without a usable title (macOS) another window of the same terminal counts as focused. Terminals in a
 # pid namespace (flatpak) never match by pid.
-here=$(dirname "$0")
+# this script's own directory, symlinks resolved (siblings and sounds/ live there)
+self=$0
+case $self in */*) ;; *) if [ -f "$self" ]; then self=./$self; else self=$(command -v "$self") || self=./$0; fi ;; esac
+while [ -h "$self" ]; do
+  _l=$(readlink "$self") || break
+  case $_l in /*) self=$_l ;; *) self=${self%/*}/$_l ;; esac
+done
+here=$(cd -P "${self%/*}/" 2>/dev/null && pwd -P) || here=$(dirname "$0")
 . "$here/claude-lib.sh"
 S=${1:-${ZELLIJ_SESSION_NAME:-}}
 T=1   # seconds per external command
