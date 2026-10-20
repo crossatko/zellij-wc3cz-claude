@@ -1,6 +1,6 @@
 #!/bin/sh
 # Optional: make the WC3 icon font (colour character icons in the tab bar) available to every terminal that
-# uses fontconfig, without editing any terminal config. Linux only. Run it yourself; nothing calls it.
+# uses fontconfig, without editing any terminal config. Linux only. Run it yourself, or via `setup.sh --font`.
 #   fontconfig/install.sh               install / update (idempotent)
 #   fontconfig/install.sh --uninstall   remove both files again
 #   fontconfig/install.sh --check       show what fontconfig picks now, change nothing
@@ -8,10 +8,11 @@
 # Writes exactly two files, both owned by this package (nothing else is touched):
 #   ${XDG_DATA_HOME:-~/.local/share}/fonts/wc3-icons.ttf             (copy of assets/wc3-icons/wc3-icons.ttf)
 #   ${XDG_CONFIG_HOME:-~/.config}/fontconfig/conf.d/60-wc3-icons.conf (rules, generated from the font)
-# then runs fc-cache on the font dir. The rules make fontconfig prefer "WC3 Icons" for exactly the codepoints
-# the font has (its emoji codepoints U+1F7E0.. and U+1FA70..): other emoji and all text are unaffected.
-# Side effect (every app using fontconfig, e.g. browsers): those few emoji (coloured circles, ballet shoes,
-# ringed planet, ...) show WC3 portraits. --uninstall reverts it.
+# then runs fc-cache on the font dir. The rules make fontconfig prefer "WC3 Icons" for the CHARACTER icon
+# codepoints of the font (U+1FA70.., one per character); other emoji and all text are unaffected. The seven
+# race fallback codepoints U+1F7E0..U+1F7E6 (orange..brown circle emoji) are NOT overridden.
+# Side effect (every app using fontconfig, e.g. browsers): those few emoji (ballet shoes, ringed planet, ...)
+# show WC3 portraits. --uninstall reverts it. An existing wc3-icons.ttf of another font is never overwritten.
 set -u
 here=$(cd "$(dirname "$0")" && pwd -P)
 font_src="$here/../assets/wc3-icons/wc3-icons.ttf"
@@ -28,7 +29,7 @@ case "${1:-}" in
   --uninstall) mode=uninstall ;;
   --check) mode=check ;;
   --print-conf) mode=print ;;
-  -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+  -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
   *) echo "unknown option $1 (see --help)" >&2; exit 2 ;;
 esac
 
@@ -37,7 +38,7 @@ say() { printf '  wc3-icons: %s\n' "$*"; }
 case "$(uname -s)" in
   Linux|*BSD|DragonFly) ;;
   Darwin) say "macOS is not supported: CoreText cannot draw this CBDT colour bitmap font."
-          say "Nothing installed. The tab bar shows initials badges / plain symbols instead."; exit 0 ;;
+          say "Nothing installed. The tab bar shows initials badges instead."; exit 0 ;;
   *) say "$(uname -s) is not supported (needs fontconfig). Nothing installed; the tab bar uses initials badges."
      exit 0 ;;
 esac
@@ -45,7 +46,8 @@ for t in fc-query fc-match; do
   command -v "$t" >/dev/null 2>&1 || { say "$t not found (fontconfig missing). Nothing installed."; exit 1; }
 done
 
-# conf_text: the rules for the codepoints the font really has (read with fc-query, so they follow font rebuilds)
+# conf_text: the rules for the character icon codepoints the font really has (read with fc-query, so they
+# follow font rebuilds). Skipped: the race fallback codepoints U+1F7E0..U+1F7E6 (common status-dot emoji).
 conf_text() {
   cs=$(fc-query -f '%{charset}' "$font_src" 2>/dev/null)
   [ -n "$cs" ] || { echo "cannot read the charset of $font_src" >&2; return 1; }
@@ -53,28 +55,17 @@ conf_text() {
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
 <!-- $marker; do not edit (rerun the script). -->
-<!-- WC3 Icons (zellij claude-tabs character icons) wins for its own codepoints only: $cs -->
+<!-- WC3 Icons (zellij claude-tabs character icons) wins for its character icon codepoints only (font charset: $cs, minus the race fallbacks 1f7e0-1f7e6, which stay with the system emoji font). -->
 <fontconfig>
-  <!-- Terminals that look up emoji through the generic "emoji" family (kitty: family "emoji" + color, ordered
-       with FcFontSort). WC3 Icons covers only its own codepoints, so every other emoji still comes from the
-       next emoji font (fontconfig ranks charset coverage above family). -->
-  <alias binding="same">
-    <family>emoji</family>
-    <prefer><family>$family</family></prefer>
-  </alias>
-  <!-- Terminals that build one fallback list for their text font (alacritty, foot, ...): WC3 Icons as a weak
-       fallback after the requested families, ahead of fonts the list does not name. Weak = never chosen over
-       a requested family for ordinary text. -->
-  <match target="pattern">
-    <edit name="family" mode="append" binding="weak"><string>$family</string></edit>
-  </match>
-  <!-- Single-character lookups of exactly these codepoints (FcFontMatch with a charset): WC3 Icons first. -->
+  <!-- Lookups with a charset (kitty asks per character, also for family "emoji" + color): WC3 Icons first. -->
 EOF
   for r in $cs; do
     lo=${r%-*}; hi=${r#*-}
     i=$(printf '%d' "0x$lo"); end=$(printf '%d' "0x$hi")
     while [ "$i" -le "$end" ]; do
-      printf '  <match target="pattern"><test name="charset" compare="contains"><charset><int>0x%x</int></charset></test><edit name="family" mode="prepend_first" binding="strong"><string>%s</string></edit></match>\n' "$i" "$family"
+      if [ "$i" -lt 128992 ] || [ "$i" -gt 128998 ]; then   # not U+1F7E0..U+1F7E6
+        printf '  <match target="pattern"><test name="charset" compare="contains"><charset><int>0x%x</int></charset></test><edit name="family" mode="prepend_first" binding="strong"><string>%s</string></edit></match>\n' "$i" "$family"
+      fi
       i=$((i + 1))
     done
   done
@@ -83,7 +74,7 @@ EOF
 
 check() {
   printf '  fc-list:     %s\n' "$(fc-list -f '%{file}\n' ":family=$family" 2>/dev/null | head -n 1)"
-  for q in "emoji:color=true:charset=1fa70" "emoji:color=true:charset=1f7e0" "monospace:charset=1fa70" \
+  for q in "emoji:color=true:charset=1fa70" "monospace:charset=1fa70" "emoji:color=true:charset=1f7e0" \
            "emoji:color=true:charset=1f600" "emoji:color=true:charset=1fae0" "monospace" "emoji"; do
     printf '  fc-match %-32s -> %s\n' "'$q'" "$(fc-match -f '%{family}' "$q" 2>/dev/null)"
   done
@@ -91,16 +82,20 @@ check() {
 
 terminal_notes() {
   cat <<'EOF'
-  Terminals (nothing below is changed by this script; copy a line yourself only if you want it):
-  - kitty: uses fontconfig for emoji fallback, works as installed (restart kitty or ctrl+shift+f5). An older
-    `symbol_map U+1F7E0-U+1F7E6,U+1FA70-U+1FAD6 WC3 Icons` line is no longer needed but does no harm.
-  - alacritty, foot and other fontconfig terminals: picked up through the rules above (alacritty: see
-    assets/wc3-icons/README.md for a vertical offset; not size-fitted there).
+  Terminals (nothing below is changed by this script; copy a line yourself only if you want it).
+  Verified: only through fc-match / kitty's own fontconfig query, not in a running terminal window.
+  - kitty: uses fontconfig for emoji fallback per character, so the rules above apply (restart kitty or
+    ctrl+shift+f5). An older `symbol_map` line for WC3 Icons is not needed but does no harm.
+  - alacritty, foot, wezterm, konsole: untested. Terminals that build one fallback list for the text font only
+    use WC3 Icons if the family is in that list; add a rule of your own, e.g.
+      <match target="pattern"><test name="family"><string>YOUR TERMINAL FONT</string></test>
+        <edit name="family" mode="append"><string>WC3 Icons</string></edit></match>
+    in ~/.config/fontconfig/conf.d (it also lets WC3 Icons answer for the circle emoji U+1F7E0..U+1F7E6).
+    alacritty also needs a vertical offset (font.offset.y), see assets/wc3-icons/README.md.
   - ghostty: ignores fontconfig for emoji; add to its config to get the icons:
-      font-codepoint-map = U+1F7E0-U+1F7E6=WC3 Icons
       font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons
   - a terminal that cannot draw colour bitmap fonts shows another emoji or a box: set `race_font "false"` in
-    the claude-tabs plugin options (plain symbols) or uninstall with --uninstall (initials badges).
+    the claude-tabs plugin options (initials badges) or uninstall with --uninstall.
 EOF
 }
 
@@ -130,20 +125,25 @@ command -v fc-cache >/dev/null 2>&1 || { say "fc-cache not found (fontconfig mis
 if [ -f "$conf_dst" ] && ! grep -qF "$marker" "$conf_dst"; then
   say "$conf_dst exists and was not written by this script; not overwriting it. Nothing installed."; exit 1
 fi
-tmp="${TMPDIR:-/tmp}/wc3-icons-conf.$$"
-conf_text >"$tmp" || { rm -f "$tmp"; exit 1; }
+mkdir -p "$font_dir" "$conf_dir" || { say "could not create $font_dir / $conf_dir"; exit 1; }
+font_tmp=
+tmp=$(mktemp "$conf_dir/.wc3-icons.conf.XXXXXX") || { say "could not create a temp file in $conf_dir"; exit 1; }
+trap 'rm -f "$tmp" "$font_tmp"' EXIT
+conf_text >"$tmp" || exit 1
 changed=0
 if ! cmp -s "$font_src" "$font_dst"; then
-  mkdir -p "$font_dir" && cp "$font_src" "$font_dst.tmp.$$" && mv -f "$font_dst.tmp.$$" "$font_dst" \
-    || { rm -f "$tmp" "$font_dst.tmp.$$"; say "could not write $font_dst"; exit 1; }
+  if [ -e "$font_dst" ] && [ "$(fc-query -f '%{family}' "$font_dst" 2>/dev/null)" != "$family" ]; then
+    say "$font_dst exists and is not the $family font; not overwriting it. Nothing installed."; exit 1
+  fi
+  font_tmp=$(mktemp "$font_dir/.wc3-icons.ttf.XXXXXX") && cp "$font_src" "$font_tmp" && chmod 644 "$font_tmp" \
+    && mv -f "$font_tmp" "$font_dst" || { say "could not write $font_dst"; exit 1; }
+  font_tmp=
   changed=1; say "installed $font_dst"
 fi
 if ! cmp -s "$tmp" "$conf_dst"; then
-  mkdir -p "$conf_dir" && cp "$tmp" "$conf_dst.tmp.$$" && mv -f "$conf_dst.tmp.$$" "$conf_dst" \
-    || { rm -f "$tmp" "$conf_dst.tmp.$$"; say "could not write $conf_dst"; exit 1; }
+  chmod 644 "$tmp" && mv -f "$tmp" "$conf_dst" || { say "could not write $conf_dst"; exit 1; }
   changed=1; say "installed $conf_dst"
 fi
-rm -f "$tmp"
 if [ "$changed" = 1 ]; then fc-cache -f "$font_dir" >/dev/null 2>&1; say "fc-cache updated"
 else say "already installed, nothing changed"; fi
 check
