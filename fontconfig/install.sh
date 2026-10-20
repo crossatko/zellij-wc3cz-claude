@@ -8,7 +8,8 @@
 # Writes exactly two files, both owned by this package (nothing else is touched):
 #   ${XDG_DATA_HOME:-~/.local/share}/fonts/wc3-icons.ttf             (copy of assets/wc3-icons/wc3-icons.ttf)
 #   ${XDG_CONFIG_HOME:-~/.config}/fontconfig/conf.d/60-wc3-icons.conf (rules, generated from the font)
-# then runs fc-cache on the font dir. The rules make fontconfig prefer "WC3 Icons" for the CHARACTER icon
+# then runs fc-cache on the font dir (creating the conf.d dir if missing) and removes the plugin's cached
+# font flag /tmp/zellij-<uid>/zellij-claude/font so the bar re-checks at the next hook event. The rules make fontconfig prefer "WC3 Icons" for the CHARACTER icon
 # codepoints of the font (U+1FA70.., one per character); other emoji and all text are unaffected. The seven
 # race fallback codepoints U+1F7E0..U+1F7E6 (orange..brown circle emoji) are NOT overridden.
 # Side effect (every app using fontconfig, e.g. browsers): those few emoji (ballet shoes, ringed planet, ...)
@@ -83,9 +84,10 @@ check() {
 terminal_notes() {
   cat <<'EOF'
   Terminals (nothing below is changed by this script; copy a line yourself only if you want it).
-  Verified: only through fc-match / kitty's own fontconfig query, not in a running terminal window.
-  - kitty: uses fontconfig for emoji fallback per character, so the rules above apply (restart kitty or
-    ctrl+shift+f5). An older `symbol_map` line for WC3 Icons is not needed but does no harm.
+  Verified in a running terminal only for kitty 0.49.2 (Linux).
+  - kitty: fontconfig alone is not enough (it prefers Noto Color Emoji for U+1FA70..U+1FAD6). Add
+      symbol_map U+1FA70-U+1FAD6 WC3 Icons
+    to kitty.conf and restart kitty (close all its windows).
   - alacritty, foot, wezterm, konsole: untested. Terminals that build one fallback list for the text font only
     use WC3 Icons if the family is in that list; add a rule of your own, e.g.
       <match target="pattern"><test name="family"><string>YOUR TERMINAL FONT</string></test>
@@ -145,6 +147,8 @@ if ! cmp -s "$tmp" "$conf_dst"; then
   changed=1; say "installed $conf_dst"
 fi
 if [ "$changed" = 1 ]; then fc-cache -f "$font_dir" >/dev/null 2>&1; say "fc-cache updated"
+  # the plugin caches "font installed?" for 10 min; drop only that flag file so the next hook re-checks
+  rm -f "/tmp/zellij-$(id -u)/zellij-claude/font" 2>/dev/null
 else say "already installed, nothing changed"; fi
 check
 terminal_notes
