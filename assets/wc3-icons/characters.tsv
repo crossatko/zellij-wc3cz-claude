@@ -16,7 +16,7 @@ human	Minometčíci	U+1FA80	11	icons/chars/BTNMortarTeam.webp
 human	Muradin Bronzebeard	U+1FA81	6	icons/chars/BTNMuradinBronzebeard.webp
 human	Paladin	U+1FA82	12	icons/chars/BTNHeroPaladin.webp
 human	Pilot dračího jestřába	U+1FA83	14	icons/chars/BTNDragonHawkRider.webp
-human	Rytíř	U+1FA84	8	icons/chars/BTNKnight.webp
+human	Rytíř	U+1FA84	8	icons/chars/BTNFootman.webp
 human	Sedlák	U+1FA85	8	icons/chars/BTNPeasant.webp
 human	Střelec	U+1FA86	10	icons/chars/BTNRifleman.webp
 human	Uther the Lightbringer	U+1FA87	6	icons/chars/BTNUther.webp
@@ -41,7 +41,7 @@ neutral	Sapper	U+1FA9C	10	icons/chars/BTNGoblinSapper.webp
 neutral	Satyrové	U+1FA9D	5	icons/chars/BTNSatyr.webp
 neutral	Sylvanas Windrunner	U+1FA9E	5	icons/chars/BTNSylvanas.webp
 neutral	Tinker	U+1FA9F	12	icons/chars/BTNHeroTinker.webp
-neutral	Vesničani	U+1FAA0	11	icons/chars/BTNVillagerMan.webp
+human	Rytíř 2 (knight rider on horse)	U+1FAA0	9	icons/chars/BTNKnight.webp
 neutral	Vile Temptress	U+1FAA1	9	icons/chars/BTNVileTemptress.webp
 neutral	Vzducholoď	U+1FAA2	7	icons/chars/BTNGoblinZeppelin.webp
 nightelf	Dozorkyně	U+1FAA3	12	icons/chars/BTNHeroWarden.webp
