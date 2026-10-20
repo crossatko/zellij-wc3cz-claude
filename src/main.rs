@@ -54,6 +54,32 @@ const DEFAULT_SOUNDS_DIR: &str = "";
 // legacy default (the link older setup.sh versions created).
 const DEFAULT_PACKAGE_DIR: &str = "~/.config/zellij/plugins/claude-tabs";
 
+// seconds a published library file stays fresh / a follower waits for the leader's file before scanning itself
+const LIBRARY_STALE_S: u64 = 100;
+const LIBRARY_GRACE_S: u64 = 15;
+
+// Package dir: the `package_dir` option wins; else keep the current dir while a scan confirmed it (the
+// hook's global pkgdir file flips between package copies on every event, each flip would force a rescan);
+// else follow the file; else the legacy default.
+fn choose_pkg(opt: Option<&str>, file: Option<&str>, current: &str, current_ok: bool) -> String {
+    if let Some(o) = opt {
+        return o.to_string();
+    }
+    if current_ok && !current.is_empty() {
+        return current.to_string();
+    }
+    file.map_or_else(|| DEFAULT_PACKAGE_DIR.to_string(), |f| f.to_string())
+}
+
+// script `name` next to phrase_script; with `phrase_script ""` (clips off) next to the package dir
+fn sibling_of(phrase_script: &str, pkg_dir: &str, name: &str) -> String {
+    match phrase_script.rfind('/') {
+        Some(i) => format!("{}/{}", &phrase_script[..i], name),
+        None if !pkg_dir.is_empty() => format!("{}/{}", pkg_dir, name),
+        None => name.to_string(),
+    }
+}
+
 // glyph + accent colour for any group name
 fn race_style(name: &str, font: bool, mac: bool) -> (String, (u8, u8, u8)) {
     if let Some(r) = RACES.iter().find(|r| r.0 == name) {
@@ -315,6 +341,8 @@ struct State {
     scanned: Vec<(String, String)>, // (race, character) pairs that have clips in the library
     scan_done: bool,
     scan_asked: u64,
+    scan_first: u64, // when this instance first wanted a scan (followers wait a little for the leader's file)
+    pkg_ok: bool,    // the current package dir was confirmed by a scan (play-phrase.sh exists there)
     race_icons: bool,
     race_tab_colors: bool,
     race_dim: f32,
@@ -584,15 +612,17 @@ impl State {
             .ok()
             .map(|v| v.trim_end_matches(&['\n', '\r'][..]).trim_end_matches('/').to_string())
             .filter(|v| v.starts_with('/') && !v.chars().any(|c| c.is_control()));
-        let pkg = self.pkg_opt.clone().or(file).unwrap_or_else(|| DEFAULT_PACKAGE_DIR.to_string());
+        let pkg = choose_pkg(self.pkg_opt.as_deref(), file.as_deref(), &self.pkg_dir, self.pkg_ok);
         let mut changed = false;
         if pkg != self.pkg_dir {
             eprintln!("claude-tabs: package dir {}", pkg);
             self.pkg_dir = pkg;
+            self.pkg_ok = false;
             if self.phrase_opt.is_none() {
                 self.phrase_script = format!("{}/play-phrase.sh", self.pkg_dir);
             }
             self.scan_asked = 0; // scan the new location now
+            self.scan_first = 0; // followers wait for the leader's new result again
             changed = true;
         }
         let font = std::fs::read_to_string(format!("{}/font", STATE_ROOT)).map_or(false, |v| v.trim() == "1");
@@ -617,12 +647,37 @@ impl State {
         self.badges.get(name).cloned().unwrap_or_else(|| badge_candidates(name)[0].clone())
     }
 
-    // lazily (re)scan <sounds_dir> through the shell: wasm cannot read $HOME
+    fn library_file(&self) -> String {
+        format!("{}/library-{}", STATE_ROOT, self.session)
+    }
+
+    // The leader scans the sound library through the shell (wasm cannot read $HOME) every 30 s and
+    // publishes the result in <state root>/library-<session>; the other instances read that file and only
+    // scan themselves when it is missing or stale (no leader scanning), after a short grace period.
     fn ask_scan(&mut self) {
         if !self.perms || self.phrase_script.is_empty() {
             return;
         }
         let now = now_secs();
+        if self.scan_first == 0 {
+            self.scan_first = now;
+        }
+        if !self.is_leader() && !self.session.is_empty() {
+            if let Ok(txt) = std::fs::read_to_string(self.library_file()) {
+                if let Some((ts, body)) = txt.split_once('\n') {
+                    if ts.trim().parse::<u64>().map_or(false, |t| now.saturating_sub(t) < LIBRARY_STALE_S) {
+                        self.pkg_ok = true; // the leader's scan found play-phrase.sh: keep the dir, no flipping
+                        if self.apply_scan(body) {
+                            self.rebuild_badges();
+                        }
+                        return;
+                    }
+                }
+            }
+            if now.saturating_sub(self.scan_first) < LIBRARY_GRACE_S {
+                return;
+            }
+        }
         if self.scan_asked != 0 && now.saturating_sub(self.scan_asked) < 30 {
             return;
         }
@@ -646,6 +701,23 @@ impl State {
             ],
             ctx,
         );
+    }
+
+    // parse "race<TAB>character" lines (play-phrase.sh --list); true when the library changed
+    fn apply_scan(&mut self, out: &str) -> bool {
+        let raw: Vec<(String, String)> = out
+            .lines()
+            .filter_map(|l| {
+                let (r, c) = l.split_once('\t')?;
+                let (r, c) = (r.trim(), c.trim());
+                (valid_race(r) && !r.starts_with('_') && valid_char(c)).then(|| (r.to_string(), c.to_string()))
+            })
+            .collect();
+        let v = self.resolve_scan(&raw);
+        let changed = v != self.scanned;
+        self.scanned = v;
+        self.scan_done = true;
+        changed
     }
 
     // Give every tab that runs Claude a race, preferring races no other tab has. The first writer wins
@@ -976,6 +1048,7 @@ impl State {
             let _ = std::fs::remove_dir_all(format!("{}/{}.sub", dir, k));
             let _ = std::fs::remove_file(format!("{}/{}.ev", dir, k));
             let _ = std::fs::remove_file(format!("{}/{}.attn", dir, k));
+            let _ = std::fs::remove_file(format!("{}/{}.attn-seen", dir, k));
             let _ = std::fs::remove_file(format!("{}/{}.sess", dir, k));
             // the hook's duplicate-event markers <pane>.once.<key>
             if let Ok(rd) = std::fs::read_dir(&dir) {
@@ -1477,26 +1550,25 @@ impl ZellijPlugin for State {
                             self.pkg_missing = p;
                         }
                         self.scan_done = true;
+                        self.pkg_ok = false;
                         self.scan_asked = now_secs().saturating_sub(25);
                     }
                     Some("scan") => {
                         self.pkg_missing.clear();
-                        // lines "race<TAB>character-prefix" (play-phrase.sh --list)
-                        let raw: Vec<(String, String)> = String::from_utf8_lossy(&out)
-                            .lines()
-                            .filter_map(|l| {
-                                let (r, c) = l.split_once('\t')?;
-                                let (r, c) = (r.trim(), c.trim());
-                                (valid_race(r) && !r.starts_with('_') && valid_char(c)).then(|| (r.to_string(), c.to_string()))
-                            })
-                            .collect();
-                        let v = self.resolve_scan(&raw);
-                        eprintln!("claude-tabs: scan found {} characters", v.len());
-                        redraw = v != self.scanned;
-                        self.scanned = v;
-                        self.scan_done = true;
+                        self.pkg_ok = true;
+                        let txt = String::from_utf8_lossy(&out).to_string();
+                        redraw = self.apply_scan(&txt);
+                        eprintln!("claude-tabs: scan found {} characters", self.scanned.len());
                         if redraw {
                             self.rebuild_badges();
+                        }
+                        if self.is_leader() && !self.session.is_empty() {
+                            // publish for the other instances (atomic: temp file + rename)
+                            let path = self.library_file();
+                            let tmp = format!("{}.{}", path, self.my_id);
+                            if std::fs::write(&tmp, format!("{}\n{}", now_secs(), txt)).is_ok() {
+                                let _ = std::fs::rename(&tmp, &path);
+                            }
                         }
                     }
                     Some("ding") if code != Some(0) => {
@@ -1672,15 +1744,12 @@ impl State {
 
     // script next to phrase_script (the package dir)
     fn sibling_script(&self, name: &str) -> String {
-        match self.phrase_script.rfind('/') {
-            Some(i) => format!("{}/{}", &self.phrase_script[..i], name),
-            None => name.to_string(),
-        }
+        sibling_of(&self.phrase_script, &self.pkg_dir, name)
     }
 
     // Ask os-focus.sh whether the terminal window of this session has the OS focus (every 2 s at most).
     fn ask_os_focus(&mut self) {
-        if !self.perms || self.phrase_script.is_empty() {
+        if !self.perms {
             return;
         }
         let now = now_secs();
@@ -1729,7 +1798,7 @@ impl State {
     // Poll the transcripts of the session's background agents (claude-agents.sh) for every Claude pane;
     // only the focused tab's instance does it, every 3 s.
     fn ask_agents(&mut self) {
-        if !self.perms || self.phrase_script.is_empty() {
+        if !self.perms {
             return;
         }
         let now = now_secs();
@@ -1738,10 +1807,7 @@ impl State {
         }
         self.agents_asked = now;
         let script = if self.agents_script.is_empty() {
-            match self.phrase_script.rfind('/') {
-                Some(i) => format!("{}/claude-agents.sh", &self.phrase_script[..i]),
-                None => "claude-agents.sh".to_string(),
-            }
+            self.sibling_script("claude-agents.sh")
         } else {
             self.agents_script.clone()
         };
@@ -1920,5 +1986,38 @@ mod tests {
         assert_eq!(badge_candidates("X")[0], "X ");
         assert_eq!(badge_candidates("42")[0], "42");
         assert_eq!(badge_candidates("straße")[0], "ST");
+    }
+
+    #[test]
+    fn pkg_dir_sticks_while_confirmed() {
+        // option always wins
+        assert_eq!(choose_pkg(Some("/o"), Some("/f"), "/c", true), "/o");
+        // confirmed current dir is kept although the hook file flips
+        assert_eq!(choose_pkg(None, Some("/b"), "/a", true), "/a");
+        // not confirmed (missing / default): follow the file
+        assert_eq!(choose_pkg(None, Some("/b"), "/a", false), "/b");
+        // nothing known: legacy default
+        assert_eq!(choose_pkg(None, None, "", false), DEFAULT_PACKAGE_DIR);
+    }
+
+    #[test]
+    fn siblings_without_phrase_script() {
+        assert_eq!(sibling_of("/p/play-phrase.sh", "/q", "os-focus.sh"), "/p/os-focus.sh");
+        assert_eq!(sibling_of("", "/q", "claude-agents.sh"), "/q/claude-agents.sh");
+    }
+
+    #[test]
+    fn character_glyphs_are_two_cells() {
+        use unicode_width::UnicodeWidthChar;
+        let defs = parse_characters(CHARACTERS_TSV);
+        assert!(defs.iter().any(|d| d.glyph.is_some()));
+        for d in &defs {
+            if let Some(g) = d.glyph {
+                assert_eq!(g.width(), Some(2), "{} U+{:X}", d.name, g as u32);
+            }
+        }
+        for r in RACES.iter().filter_map(|r| r.3) {
+            assert_eq!(r.chars().next().and_then(|c| c.width()), Some(2), "race icon {:?}", r);
+        }
     }
 }

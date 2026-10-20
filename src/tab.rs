@@ -1,6 +1,6 @@
 use crate::{line::tab_separator, LinePart};
 use ansi_term::{ANSIString, ANSIStrings};
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use zellij_tile::prelude::*;
 use zellij_tile_utils::style;
 
@@ -59,8 +59,9 @@ fn rel_lum(c: (u8, u8, u8)) -> f32 {
 // Icon-font glyphs (race icons U+1F7E0..E6, character icons U+1FA70..U+1FAD6) are emoji codepoints: wide
 // (2 cells) for unicode-width and drawn as 2-cell colour bitmaps, so no extra padding is needed. Private-use
 // codepoints do not work: kitty draws them as 1-cell monochrome alpha masks.
+// Only codepoints that really are 2 cells wide count (some unused ones in the range report width 1).
 fn is_icon_font_char(c: char) -> bool {
-    ('\u{1F7E0}'..='\u{1F7E6}').contains(&c) || ('\u{1FA70}'..='\u{1FAFF}').contains(&c)
+    (('\u{1F7E0}'..='\u{1F7E6}').contains(&c) || ('\u{1FA70}'..='\u{1FAFF}').contains(&c)) && c.width() == Some(2)
 }
 
 pub fn contrast(a: (u8, u8, u8), b: (u8, u8, u8)) -> f32 {
