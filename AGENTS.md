@@ -209,3 +209,8 @@ Claude tab (icon + tint), a Czech WC3 voice line of that race when an agent fini
   (not done by the agent) or the session is restarted.
 - Open: update the external packaging script's target path; test on a Mac and other desktops;
   `git init` + first commit by the owner.
+
+## TODO: macOS icon font (needs a Mac to test)
+- The WC3 icon font is CBDT/CBLC (Google colour bitmaps), built by `assets/wc3-icons/build.py` from the 7 webp icons. Believed (NOT tested) that macOS CoreText, which kitty and Ghostty use there, does not draw CBDT; it draws Apple's `sbix`. The user thinks kitty/ghostty on macOS may support it, so test first: install the current font, set `race_font on`, and look.
+- If the icons don't render: add an `sbix` build (same codepoints U+1F7E0..U+1F7E6, 2 cells wide) to build.py, have `setup.sh` install it on Darwin, and keep `race_font` auto-off until verified. Tune the bitmap size per terminal (cell-height shrink behaviour seen in kitty on Linux may differ).
+- Until then macOS uses plain symbols (`race_font` auto = off on Darwin).
