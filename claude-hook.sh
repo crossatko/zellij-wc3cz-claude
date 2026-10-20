@@ -2,7 +2,7 @@
 # Claude Code hook -> zellij claude-tabs plugin.
 # Usage: claude-hook.sh start|working|done|end|substart|substop|tool|ask|notify|clear   (hook JSON arrives on stdin)
 # ask (PermissionRequest) / notify (Notification) / tool (PreToolUse AskUserQuestion, ExitPlanMode) raise the
-# attention overlay <pane>.attn ("<ns> [away] ag=<agent id or ->"); clear (PostToolUse, PostToolUseFailure),
+# attention overlay <pane>.attn ("<ns> [away] ag=<agent id, main = the main agent>"); clear (PostToolUse, PostToolUseFailure),
 # a later tool call, SubagentStop, UserPromptSubmit, Stop, SessionStart/End remove it.
 # Writes the per-pane state the plugin reads, then pokes it. Silent no-op outside zellij.
 # Also tells the plugin where this package lives (<state root>/pkgdir) and whether the WC3 Icons font is
@@ -32,14 +32,18 @@ put() {
 put "$root/pkgdir" "$here"
 # font flag: fc-list in the background (a cold fontconfig cache can take seconds); macOS = 0 (CoreText
 # draws no CBDT colour bitmaps)
+# The claim is the directory font.claim (mkdir is atomic): one check at a time, also while font does not exist yet.
 if [ -z "$(find "$root/font" -mmin -10 2>/dev/null)" ]; then
-  [ -f "$root/font" ] && touch "$root/font" 2>/dev/null   # claim: no parallel re-checks
-  ( v=0
-    case "$(uname -s 2>/dev/null)" in
-      Darwin) ;;
-      *) command -v fc-list >/dev/null 2>&1 && run_timeout 10 fc-list 'WC3 Icons' family 2>/dev/null | grep -qi 'WC3 Icons' && v=1 ;;
-    esac
-    printf '%s\n' "$v" >"$root/font.$$" && mv -f "$root/font.$$" "$root/font" ) </dev/null >/dev/null 2>&1 &
+  if mkdir "$root/font.claim" 2>/dev/null \
+     || { [ -n "$(find "$root/font.claim" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$root/font.claim" 2>/dev/null && mkdir "$root/font.claim" 2>/dev/null; }; then
+    ( v=0
+      case "$(uname -s 2>/dev/null)" in
+        Darwin) ;;
+        *) command -v fc-list >/dev/null 2>&1 && run_timeout 10 fc-list 'WC3 Icons' family 2>/dev/null | grep -qi 'WC3 Icons' && v=1 ;;
+      esac
+      printf '%s\n' "$v" >"$root/font.$$" && mv -f "$root/font.$$" "$root/font"
+      rmdir "$root/font.claim" 2>/dev/null ) </dev/null >/dev/null 2>&1 &
+  fi
 fi
 # debug: `touch <state root>/debug` logs every event (with stdin JSON) to <state root>/debug.log
 if [ -e "$root/debug" ]; then
@@ -50,27 +54,56 @@ fi
 if [ -z "$2" ]; then set -- "$1" "$(cat)"; fi
 json_str() { printf '%s' "$2" | sed -n 's/.*"'"$1"'"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1; }
 # the terminal window of this session is not the OS-focused window (os-focus.sh; unknown = not away)
+# The helper runs in the background with every fd detached (a hung child can then never keep our pipe, or
+# Claude Code's hook pipe, open) and its answer goes through a file; we wait at most ~1.5 s wall time and
+# treat a missing answer as unknown.
 os_away() {
-  [ "${ZELLIJ_CLAUDE_OS_FOCUS:-1}" != 0 ] \
-    && [ "$(run_timeout 1 sh "$here/os-focus.sh" "$ZELLIJ_SESSION_NAME" 2>/dev/null)" = unfocused ] && printf ' away'
+  [ "${ZELLIJ_CLAUDE_OS_FOCUS:-1}" != 0 ] || return 0
+  _of=$f.os.$$; rm -f "$_of" "$_of.done"
+  ( run_timeout 1 sh "$here/os-focus.sh" "$ZELLIJ_SESSION_NAME" >"$_of" 2>/dev/null </dev/null; : >"$_of.done" ) </dev/null >/dev/null 2>&1 &
+  _n=0; _max=15; _st=0.1
+  sleep 0.1 2>/dev/null || { _st=1; _max=2; }
+  while [ ! -e "$_of.done" ] && [ "$_n" -lt "$_max" ]; do sleep "$_st"; _n=$((_n + 1)); done
+  _r=""; [ -e "$_of.done" ] && IFS= read -r _r <"$_of"
+  rm -f "$_of" "$_of.done"
+  [ "$_r" = unfocused ] && printf ' away'
+  return 0
 }
 # attention: raise the overlay unless one is already pending (PermissionRequest, Notification and PreToolUse
-# of one request must ding once)
+# of one request must ding once). <pane>.attn-seen is a tombstone of the last raise ("<ns> ag=<agent>"): the
+# plugin deletes .attn when the tab is in view, and a duplicate signal for that same request (the Notification
+# arrives after the PermissionRequest) must not raise it again, so within 10 s of the raise and until a
+# clearing event of the asking agent it is ignored.
+agent_of() { _a=$(json_str agent_id "$1"); printf '%s' "${_a:-main}"; }
 attn_raise() {
   [ -e "$f.attn" ] && return 0
+  if [ -e "$f.attn-seen" ]; then
+    _s=$(cut -d' ' -f1 "$f.attn-seen" 2>/dev/null)
+    case $_s in ''|*[!0-9]*) _s=0 ;; esac
+    [ $(( $(now_ns) - _s )) -lt 10000000000 ] && return 0
+    rm -f "$f.attn-seen"
+  fi
   [ -e "$f" ] || write idle
-  ag=$(json_str agent_id "$2"); [ -n "$ag" ] || ag=-
+  ag=$(agent_of "$2")
+  _ns=$(now_ns)
   # link(2) never replaces: of two concurrent raises exactly one overlay (one ns, one ding) survives
-  printf '%s%s ag=%s\n' "$(now_ns)" "$(os_away)" "$ag" >"$f.attn.$$" && { ln "$f.attn.$$" "$f.attn" 2>/dev/null; rm -f "$f.attn.$$"; }
+  printf '%s%s ag=%s\n' "$_ns" "$(os_away)" "$ag" >"$f.attn.$$" && { ln "$f.attn.$$" "$f.attn" 2>/dev/null; rm -f "$f.attn.$$"; }
+  printf '%s ag=%s\n' "$_ns" "$ag" >"$f.attn-seen"
   : >"$f.ev"
 }
-# attn_drop PAYLOAD: remove the overlay when the event comes from the agent that asked (or the asker is unknown)
+# attn_drop PAYLOAD: remove the overlay (and the tombstone) when the event comes from the agent that asked,
+# or the asker is unknown (legacy overlay "ag=-"); a subagent's tool call leaves the main agent's request alone.
+# Returns 0 when the overlay itself was removed.
 attn_drop() {
-  [ -e "$f.attn" ] || return 1
-  want=$(sed -n 's/.* ag=\(.*\)$/\1/p' "$f.attn" 2>/dev/null | head -n 1)
-  ag=$(json_str agent_id "$1"); [ -n "$ag" ] || ag=-
-  if [ "$want" = - ] || [ "$want" = "$ag" ]; then rm -f "$f.attn"; return 0; fi
-  return 1
+  _ag=$(agent_of "$1"); _r=1
+  for _x in attn attn-seen; do
+    [ -e "$f.$_x" ] || continue
+    _w=$(sed -n 's/.* ag=\(.*\)$/\1/p' "$f.$_x" 2>/dev/null | head -n 1)
+    if [ -z "$_w" ] || [ "$_w" = - ] || [ "$_w" = "$_ag" ]; then
+      rm -f "$f.$_x"; [ "$_x" = attn ] && _r=0
+    fi
+  done
+  return $_r
 }
 # Notifications other than "needs an answer" (idle_prompt, auth_success, ...) are not activity either
 if [ "$1" = notify ]; then
@@ -111,24 +144,34 @@ case "$1" in
            exit 0 ;;
   ask|notify) attn_raise "$@" ;;
   clear)   # PostToolUse / PostToolUseFailure: cheap no-op unless an attention request is pending
-           [ -e "$f.attn" ] || exit 0
+           [ -e "$f.attn" ] || [ -e "$f.attn-seen" ] || exit 0
            attn_drop "$2" && : >"$f.ev" || exit 0 ;;
-  start)   rm -rf "$sub"; rm -f "$f.attn"; write idle ;;
-  working) rm -f "$f.attn"; write working ;;
+  start)   rm -rf "$sub"; rm -f "$f.attn" "$f.attn-seen"; write idle ;;
+  working) rm -f "$f.attn" "$f.attn-seen"; write working ;;
   done)    # background subagents may outlive the main turn: keep their markers, and tell the plugin that
            # this Stop is not a real finish while a (non-stale) subagent marker exists
-           stale_min=$(( ${ZELLIJ_CLAUDE_STALE_S:-900} / 60 ))
+           stale_s=${ZELLIJ_CLAUDE_STALE_S:-900}
+           case $stale_s in ''|*[!0-9]*) stale_s=900 ;; esac
+           stale_min=$(( stale_s / 60 ))
            running=""
            [ -f "$f.sess" ] && running=$(sh "$here/claude-agents.sh" "$(cat "$f.sess")" 2>/dev/null | head -n 1)
            # " away" = the terminal window showing this session is not the OS-focused window (os-focus.sh;
            # unknown counts as not away); the plugin then also dings/blinks the active tab.
            # ZELLIJ_CLAUDE_OS_FOCUS=0 skips the check.
            away=$(os_away)
-           # a Stop while a question is still pending (interrupted): the owner is at the keyboard and the
-           # attention ding already fired, so this finish is " quiet" (no second ding)
-           if [ -e "$f.attn" ]; then away="$away quiet"; rm -f "$f.attn"; fi
+           # a Stop while a question of the main agent is still pending (interrupted, raised < 60 s ago): the user
+           # is at the keyboard and the attention ding already fired, so this finish is " quiet" (no second
+           # ding). A stale or foreign overlay is just dropped and the finish dings normally.
+           if [ -e "$f.attn" ]; then
+             _l=$(cat "$f.attn" 2>/dev/null)
+             _ans=${_l%% *}; _wa=${_l##* ag=}
+             case $_ans in ''|*[!0-9]*) _ans=0 ;; esac
+             if [ $(( $(now_ns) - _ans )) -lt 60000000000 ] && { [ "$_wa" = main ] || [ "$_wa" = - ]; }; then away="$away quiet"; fi
+             rm -f "$f.attn"
+           fi
+           rm -f "$f.attn-seen"
            if [ -n "$running" ] || [ -n "$(find "$sub" -type f -mmin -"$stale_min" 2>/dev/null | head -n 1)" ]; then write done " sub$away"; else write done "$away"; fi ;;
-  end)     rm -f "$f" "$f.ev" "$f.sess" "$f.attn"; rm -rf "$sub" "$f".once.* ;;
+  end)     rm -f "$f" "$f.ev" "$f.sess" "$f.attn" "$f.attn-seen"; rm -rf "$sub" "$f".once.* ;;
   substart|substop)
     [ -n "$2" ] || set -- "$1" "$(cat)"
     id=$(printf '%s' "$2" | sed -n 's/.*"agent_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1 | tr -c 'A-Za-z0-9_\n-' '_')
@@ -138,6 +181,7 @@ case "$1" in
     else
       rm -f "$sub/$id"
       [ "$(sed -n 's/.* ag=//p' "$f.attn" 2>/dev/null)" = "$id" ] && rm -f "$f.attn"
+      [ "$(sed -n 's/.* ag=//p' "$f.attn-seen" 2>/dev/null)" = "$id" ] && rm -f "$f.attn-seen"
     fi ;;
   *) exit 0 ;;
 esac
