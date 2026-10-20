@@ -48,7 +48,7 @@ fn mix(a: (u8, u8, u8), b: (u8, u8, u8), t: f32) -> (u8, u8, u8) {
     (m(a.0, b.0), m(a.1, b.1), m(a.2, b.2))
 }
 
-fn rel_lum(c: (u8, u8, u8)) -> f32 {
+pub fn rel_lum(c: (u8, u8, u8)) -> f32 {
     let f = |v: u8| {
         let v = v as f32 / 255.0;
         if v <= 0.03928 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) }

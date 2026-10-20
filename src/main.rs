@@ -137,6 +137,8 @@ struct CharDef {
     of: usize,           // number of characters of its race
 }
 
+// default plain_dim: plain bg luminance = median inactive Claude tab (test plain_matches_dimmed_claude_tabs)
+const PLAIN_DIM_DEFAULT: f32 = 0.18;
 const CHARACTERS_TSV: &str = include_str!("../assets/wc3-icons/characters.tsv");
 
 fn parse_characters(tsv: &str) -> Vec<CharDef> {
@@ -1391,7 +1393,7 @@ impl ZellijPlugin for State {
         self.active_underline = truthy(cfg.get("active_underline"), false);
         self.tab_numbers = truthy(cfg.get("tab_numbers"), false);
         self.race_dim = cfg.get("race_dim").and_then(|v| v.parse::<f32>().ok()).map_or(0.4, |v| v.clamp(0.1, 1.0));
-        self.plain_dim = cfg.get("plain_dim").and_then(|v| v.parse::<f32>().ok()).map_or(0.4, |v| v.clamp(0.1, 1.0));
+        self.plain_dim = cfg.get("plain_dim").and_then(|v| v.parse::<f32>().ok()).map_or(PLAIN_DIM_DEFAULT, |v| v.clamp(0.1, 1.0));
         self.race_all_tabs = truthy(cfg.get("race_all_tabs"), false);
         self.races_opt = cfg
             .get("races")
@@ -2022,6 +2024,39 @@ impl State {
 mod tests {
     use super::*;
     use unicode_width::UnicodeWidthStr;
+
+    // relative luminance of every inactive Claude tab background (race_dim 0.4), all characters
+    fn claude_bgs(dim: f32) -> Vec<(String, (u8, u8, u8))> {
+        parse_characters(CHARACTERS_TSV)
+            .iter()
+            .map(|d| {
+                let (_, rgb) = race_style(&d.race, false, false);
+                let acc = character_accent(rgb, &d.name, Some((d.ord, d.of)));
+                (d.name.clone(), crate::tab::tint_colors(acc, false, dim).0)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn plain_matches_dimmed_claude_tabs() {
+        let mut l: Vec<f32> = claude_bgs(0.4).iter().map(|(_, c)| crate::tab::rel_lum(*c)).collect();
+        l.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let med = l[l.len() / 2];
+        let mut bgs = claude_bgs(0.4);
+        bgs.sort_by(|a, b| crate::tab::rel_lum(a.1).partial_cmp(&crate::tab::rel_lum(b.1)).unwrap());
+        println!("claude bg min {:?} median {:?} max {:?}", bgs[0].1, bgs[bgs.len() / 2].1, bgs[bgs.len() - 1].1);
+        let mean = l.iter().sum::<f32>() / l.len() as f32;
+        println!("claude inactive bg luminance: n {} min {:.4} q1 {:.4} median {:.4} mean {:.4} q3 {:.4} max {:.4}",
+            l.len(), l[0], l[l.len() / 4], med, mean, l[l.len() * 3 / 4], l[l.len() - 1]);
+        for d in [0.4f32, 0.3, 0.25, 0.2, 0.15] {
+            let (bg, fg) = crate::tab::plain_colors((0x23, 0x20, 0x22), (0xd5, 0xb9, 0xbb), d);
+            println!("plain_dim {d}: bg {bg:?} lum {:.4} fg {fg:?}", crate::tab::rel_lum(bg));
+        }
+        let (bg, _) = crate::tab::plain_colors((0x23, 0x20, 0x22), (0xd5, 0xb9, 0xbb), PLAIN_DIM_DEFAULT);
+        let pl = crate::tab::rel_lum(bg);
+        println!("default {PLAIN_DIM_DEFAULT}: bg {bg:?} lum {pl:.4}");
+        assert!((pl - med).abs() / med < 0.15, "plain lum {pl} vs median {med}");
+    }
 
     #[test]
     fn max_clip_s_parsing() {

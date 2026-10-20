@@ -234,7 +234,7 @@ written blind.
   active = accent +15 %, black/white text, bold. Theme-independent.
   Plain inactive tabs (no tint): zellij maps old-style themes' `fg` to `ribbon_unselected.background` (bright), so
   `plain_colors` (`src/tab.rs`) blends it toward `text_unselected.background` by option `plain_dim` (0.1-1, default
-  0.4, 1 = off) and picks text at just 4.5:1; not applied to active/blinking/bell/session-dimmed tabs or 8-bit themes. Working = italic marker, finished-unseen
+  0.18 = median luminance of inactive Claude tabs at race_dim 0.4, test-guarded; 1 = off) and picks text at just 4.5:1; not applied to active/blinking/bell/session-dimmed tabs or 8-bit themes. Working = italic marker, finished-unseen
   = inverted badge, blink phase `(ms / blink_ms) % 2`, `blink_timeout_s` (600). Spinner frames
   `· ✢ ✳ ✶ ✻ ✽` ping-pong (Claude Code 2.1.303). Options `race_icons/race_font/race_tab_colors/race_dim/
   race_all_tabs` keep their old names.
