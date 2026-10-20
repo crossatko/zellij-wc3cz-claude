@@ -82,13 +82,23 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   ONCE to the cache dir as a hash of the URL and never refreshed while that file exists (unsuitable for
   updates). `zellij --layout X` inside a session or with `-s` ADDS tabs to that session; `zellij -n X`
   always starts a new session. Plugin options can be given in the layout's plugin block.
-- PERMISSION PROMPT PROBLEM (verified in isolated session pkgtestb, current wasm): the prompt is drawn in
-  the 1-row bar ("This plugin asks permission to: ... Allow? (y/n)"), but the plugin calls
-  `set_selectable(false)` before `request_permission`, so the pane cannot be focused (`move-focus` stays on
-  the terminal; `list-panes -a` shows is_selectable false) and `y` goes to the shell: the default
-  "press y" path does not work. Needs the runtime side (src) to stay selectable until
-  PermissionRequestResult. With `setup.sh --permissions` (grant for the expanded marketplace path) the
-  plugin loaded without a prompt (verified, same session setup).
+- Permission prompt (fixed 2026-10-20; was: `set_selectable(false)` before `request_permission`, so the
+  bar could never be focused and `y` went to the shell). zellij 0.45.1 draws its prompt in the 1-row bar
+  ("This plugin asks permission to: ... Allow? (y/n)", one line at 120 cols, cut on narrower terminals)
+  and HOLDS BACK every event (Timer included) until it is answered. The pane now stays selectable until
+  PermissionRequestResult (Granted or Denied) or the first TabUpdate/PaneUpdate/ModeUpdate/RunCommandResult,
+  then `set_selectable(false)` once; zellij moves focus back to the terminal by itself. `perms` starts
+  false and turns true on those events (a synchronous host call such as `get_session_list` PANICS the
+  plugin when denied: `fetch_snapshot`/`in_focused_tab` are gated). Denied = bar shows
+  "claude-tabs: permissions denied (README: Troubleshooting)", unselectable; a denial is not cached as a
+  grant, the next session asks again. Verified (isolated session pktest-perm, own ZELLIJ_CONFIG_DIR +
+  XDG_CACHE_HOME, headless `script` client fed by a fifo, pyte render of the typescript, `list-panes -j -a`
+  for is_selectable/is_focused): fresh cache -> prompt, Alt+Down (or a mouse click on the bar) focuses it,
+  `y` -> grant written, bar renders, unselectable, focus back on the terminal, hook `working` shows the
+  spinner; `n` -> no panic, hint, unselectable; cached grant -> no prompt, PermissionRequestResult(Granted)
+  IS delivered, unselectable; `start-or-reload-plugin` with 3 tabs (2 inactive) -> every instance gets
+  PermissionRequestResult(Granted) again, all unselectable. Not verified: several tabs open while the
+  prompt is pending, terminals narrower than the prompt text.
 - `fontconfig/install.sh` (Linux/BSD; macOS/others print "not supported, initials badges", exit 0):
   copies the font to `${XDG_DATA_HOME:-~/.local/share}/fonts/wc3-icons.ttf`, writes
   `${XDG_CONFIG_HOME:-~/.config}/fontconfig/conf.d/60-wc3-icons.conf` GENERATED from the installed font's
@@ -192,7 +202,7 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   after a reload also no ModeUpdate, so the session name is learned from `get_session_list()`). Only the
   LEADER (lowest live claude-tabs plugin pane id in a fresh `get_session_list()` snapshot) dings,
   auto-switches, acknowledges Done -> Idle, assigns characters and deletes state of closed panes. `perms`
-  defaults to true (PermissionRequestResult is not re-sent after a reload).
+  starts false (see "Permission prompt").
 - Focused tab: `get_focused_pane_info()` returns the tab ID while the manifest is keyed by POSITION;
   mapped through `TabInfo` (bug: spinner never animated after a tab was closed). Only the focused
   instance runs the fast timer (spinner, blink) and polls agents every 3 s.
@@ -331,7 +341,8 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   size 18 unfitted: needs `font.offset.y = 6`. ghostty 1.3.1: ignores fontconfig for emoji codepoints, needs
   `font-codepoint-map = U+1F7E0-U+1F7E6=WC3 Icons` (+ U+1FA70-U+1FAD6), scales to the natural cell (22x29 at 15x29,
   gaps with adjusted line height). wezterm/foot/konsole/gnome-terminal/xterm/st/etc. are not installed: untested.
-  Mitigations suggested, not implemented (fontconfig snippet from setup.sh, document codepoint-map, `race_font off`).
+  Mitigations: fontconfig rules via `fontconfig/install.sh` (= `setup.sh --font`, see "Install / packaging"),
+  ghostty `font-codepoint-map` and `race_font off` documented in the README.
   Test harness lived in the agent scratchpad (floating kitty/alacritty/ghostty on the secondary monitor via
   `hyprctl eval "hl.exec_cmd(cmd,{float=true,monitor=...,no_initial_focus=true,...})"`; `hl.window_rule` via eval did
   NOT apply on this Hyprland 0.56 (window tiled and stole focus once); frame-coloured test bitmaps for measuring).

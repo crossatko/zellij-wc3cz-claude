@@ -301,6 +301,9 @@ struct State {
     tabs: Vec<TabInfo>,
     manifest: Option<PaneManifest>,
     perms: bool,
+    // set_selectable(false) done (only once the permission question is resolved, see load())
+    unselectable: bool,
+    perms_denied: bool,
     files: HashMap<u32, PaneState>,
     // last "done" timestamp we reacted to (ding/auto switch) and last one shown as seen
     reacted: HashMap<u32, u128>,
@@ -911,6 +914,9 @@ impl State {
 
     // Fresh tabs / panes of the current session straight from the server.
     fn fetch_snapshot(&mut self) -> bool {
+        if !self.perms {
+            return false;
+        }
         let Ok(snap) = get_session_list() else { return false };
         let Some(si) = snap.live_sessions.into_iter().find(|s| s.is_current_session) else { return false };
         self.snap_at = now_secs();
@@ -1191,6 +1197,28 @@ fn looks_like_claude(p: &PaneInfo) -> bool {
         || p.title.contains("Claude Code")
 }
 
+impl State {
+    // the permission question is answered (or was cached / survived a reload) and granted
+    fn permission_ok(&mut self) {
+        self.make_unselectable();
+        if !self.perms {
+            self.perms = true;
+            self.perms_denied = false;
+            self.ask_tz();
+            self.ask_scan();
+            self.ask_os();
+            self.refresh_names();
+        }
+    }
+
+    fn make_unselectable(&mut self) {
+        if !self.unselectable {
+            self.unselectable = true;
+            set_selectable(false);
+        }
+    }
+}
+
 impl ZellijPlugin for State {
     fn load(&mut self, cfg: BTreeMap<String, String>) {
         self.ding_command = cfg.get("ding_command").cloned().unwrap_or_default();
@@ -1201,7 +1229,9 @@ impl ZellijPlugin for State {
         self.auto_switch = truthy(cfg.get("auto_switch"), false);
         self.show_icon_fallback = truthy(cfg.get("title_fallback"), true);
         self.auto_name = truthy(cfg.get("auto_name"), true);
-        self.perms = true; // PermissionRequestResult is not re-sent to a reloaded instance; only a denial turns this off
+        // false until PermissionRequestResult(Granted) or an event that needs ReadApplicationState arrives
+        // (permission_ok); a synchronous host call (get_session_list etc.) panics the plugin while denied
+        self.perms = false;
         self.clock = truthy(cfg.get("clock"), true);
         self.race_icons = truthy(cfg.get("race_icons"), true);
         self.race_tab_colors = truthy(cfg.get("race_tab_colors"), true);
@@ -1249,7 +1279,11 @@ impl ZellijPlugin for State {
         self.refresh_paths();
         self.player = cfg.get("player").cloned().unwrap_or_default(); // empty = autodetect in play-phrase.sh
         self.my_id = get_plugin_ids().plugin_id;
-        set_selectable(false);
+        // stay selectable until the permission question is resolved: zellij draws its one-time
+        // "Allow? (y/n)" prompt in this pane and only a focused pane gets the `y`. Made unselectable on
+        // PermissionRequestResult (zellij 0.45.1 also sends it with a cached grant and after a reload) or,
+        // as a fallback, on the first event that needs a granted permission. zellij holds back all events
+        // while the prompt is open.
         request_permission(&[
             PermissionType::ReadApplicationState,
             PermissionType::ChangeApplicationState,
@@ -1272,13 +1306,20 @@ impl ZellijPlugin for State {
     }
 
     fn update(&mut self, event: Event) -> bool {
+        match &event {
+            // zellij delivers these only with the permissions granted
+            Event::TabUpdate(_) | Event::PaneUpdate(_) | Event::ModeUpdate(_) | Event::RunCommandResult(..) => self.permission_ok(),
+            _ => {}
+        }
         match event {
             Event::PermissionRequestResult(s) => {
-                self.perms = s == PermissionStatus::Granted;
-                self.ask_tz();
-                self.ask_scan();
-                self.ask_os();
-                self.refresh_names();
+                if s == PermissionStatus::Granted {
+                    self.permission_ok();
+                } else {
+                    self.perms = false;
+                    self.perms_denied = true;
+                    self.make_unselectable();
+                }
                 true
             }
             Event::ModeUpdate(mi) => {
@@ -1539,6 +1580,8 @@ impl ZellijPlugin for State {
         if let Some(dest) = self.text_copy_destination {
             let hint = clipboard_utils::text_copied_hint(dest).part;
             self.render_background_with_text(&hint);
+        } else if self.perms_denied {
+            self.render_background_with_text(" claude-tabs: permissions denied (README: Troubleshooting)");
         } else if self.display_system_clipboard_failure {
             let hint = clipboard_utils::system_clipboard_error().part;
             self.render_background_with_text(&hint);
@@ -1640,6 +1683,9 @@ impl State {
     fn in_focused_tab(&self) -> bool {
         // NOTE get_focused_pane_info() returns the tab ID, the manifest is keyed by tab POSITION; they
         // differ as soon as a tab was closed, so compare ids
+        if !self.perms {
+            return false;
+        }
         let Ok((focused_id, _)) = get_focused_pane_info() else { return true };
         let mine_pos = self.manifest.as_ref().and_then(|m| {
             m.panes

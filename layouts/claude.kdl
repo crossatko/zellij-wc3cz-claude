@@ -7,7 +7,8 @@
 //   - installed as a Claude Code plugin from GitHub: the marketplace clone below
 //     (with CLAUDE_CONFIG_DIR set: $CLAUDE_CONFIG_DIR/plugins/marketplaces/zellij-wc3cz/claude-tabs.wasm)
 //   - a git checkout: file:/path/to/zellij-wc3cz-claude/claude-tabs.wasm
-// zellij asks once for the plugin's permissions (press y); the grant is remembered for this exact path.
+// zellij asks once for the plugin's permissions in the bar: click the bar (or Alt+Down) and press y;
+// the grant is remembered for this exact path.
 // Plugin options (README "Options") go into the plugin block, e.g. ding_when_focused false.
 layout {
     pane

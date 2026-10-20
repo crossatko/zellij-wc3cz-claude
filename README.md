@@ -83,9 +83,11 @@ Nothing in your existing config files has to change. Two steps:
 
    **One-time permission prompt**: the first time, zellij asks in the bar whether the plugin may read
    and change the session state, run commands (the sound player, helper scripts) and receive pipes
-   (`Allow? (y/n)`): focus the bar and press `y`. zellij remembers the answer for exactly this wasm path
-   (`permissions.kdl` in zellij's cache dir). If the prompt cannot be answered, pre-grant instead:
-   `sh ~/.claude/plugins/marketplaces/zellij-wc3cz/setup.sh --permissions`.
+   (`Allow? (y/n)`): focus the bar with a mouse click on it or `Alt+↓` (zellij's default move-focus key)
+   and press `y`. The bar then shows the tabs and can no longer be focused; focus returns to your pane.
+   zellij remembers the answer for exactly this wasm path (`permissions.kdl` in zellij's cache dir).
+   Pressing `n` leaves the bar showing "permissions denied"; a new session asks again. To skip the
+   prompt, pre-grant instead: `sh ~/.claude/plugins/marketplaces/zellij-wc3cz/setup.sh --permissions`.
 
 That is all: voice lines, agent counts and attention markers work once a `claude` in that session has
 run a hook (the hook tells the plugin where the package is). Plugin options go into the `plugin` block
@@ -311,8 +313,11 @@ Arch: `sudo pacman -S rust rust-wasm`. `target/` is git-ignored.
 - **Old bar after an update**: sessions started before keep their plugin; `dev.sh -s SESSION` reloads
   the code, a new session picks up everything.
 - **Permission prompt every time / cannot answer it**: zellij keys the grant by the exact (`~`-expanded)
-  wasm path in the layout, so a moved checkout or another path asks again. `<pkg>/setup.sh --permissions`
-  pre-grants this package's path (run the `setup.sh` of the copy the layout points at).
+  wasm path in the layout, so a moved checkout or another path asks again. The prompt is answered in the
+  bar: click it (or `Alt+↓`), then `y`. `<pkg>/setup.sh --permissions` pre-grants this package's path (run
+  the `setup.sh` of the copy the layout points at).
+- **Bar says "permissions denied"**: the prompt was answered with `n`. Start a new session and answer `y`,
+  or pre-grant with `<pkg>/setup.sh --permissions`.
 - **Hooks fire twice** (two dings, doubled state changes): the plugin and old `settings.json` hooks are both
   active; `<pkg>/setup.sh` shows it, `<pkg>/setup.sh --migrate-to-plugin` removes the old entries.
 - **No sounds / no agent counts, everything else fine**: the plugin cannot find the scripts. It learns the
