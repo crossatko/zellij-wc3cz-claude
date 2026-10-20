@@ -366,6 +366,11 @@ written blind.
 - With two package copies the plugin sticks to the first confirmed one (not necessarily the newest);
   `package_dir` forces one. Followers adopt "confirmed" from the leader's library file, not from a scan.
 - Bluetooth wake-up clipping of the first ms is a hypothesis; use `lead_in_ms` to test.
+- `max_clip_s` (plugin option, seconds, fractional ok, 0/junk = none): `ding()` passes it as env
+  `ZELLIJ_CLAUDE_MAX_CLIP_S` (only when set; never for `--list`); play-phrase.sh drops longer clips, a character
+  without a short one plays its shortest (Hnus, shortest 3.4 s). Verified in isolated sessions with a stub player:
+  `max_clip_s "3"` -> 30 dings of 10 characters, all <= 3 s except Hnus's own shortest; unset -> clips of 8 s and
+  25.9 s were picked. Pit Lord has no active clip (character fully excluded, `characters.tsv` clips 0).
 - The font flag says "installed", not "this terminal draws it": alacritty/ghostty need extra terminal
   config (README); colour icons are unverified on macOS and other terminals. Such users set `race_font off`.
 - Once after a reload one finish produced two identical dings (two instances acted); not reproduced.
