@@ -240,6 +240,14 @@ fn diverse_pick(defs: &[CharDef], cands: &[String], ctx: &[(String, usize)], rec
         })
         .collect();
     let total: f64 = ws.iter().sum();
+    if pool.is_empty() {
+        return None;
+    }
+    if !(total.is_finite() && total > 0.0) {
+        // degenerate weights: uniform pick
+        let i = ((r.clamp(0.0, 0.999_999_9) * pool.len() as f64) as usize).min(pool.len() - 1);
+        return Some(pool[i].clone());
+    }
     let mut x = r.clamp(0.0, 0.999_999_9) * total;
     for (n, w) in pool.iter().zip(&ws) {
         if x < *w {
@@ -248,6 +256,13 @@ fn diverse_pick(defs: &[CharDef], cands: &[String], ctx: &[(String, usize)], rec
         x -= w;
     }
     pool.last().map(|n| (*n).clone())
+}
+
+// recent-characters file body after appending `name`: the newest 16 lines
+fn recent_body(mut v: Vec<String>, name: &str) -> String {
+    v.push(name.to_string());
+    let skip = v.len().saturating_sub(16);
+    v.split_off(skip).join("\n") + "\n"
 }
 
 fn hash_name(name: &str) -> u32 {
@@ -637,12 +652,10 @@ impl State {
     }
 
     fn push_recent(&self, name: &str) {
-        let mut v = self.read_recent();
-        v.push(name.to_string());
-        let skip = v.len().saturating_sub(16);
         let path = format!("{}/recent-characters", STATE_ROOT);
-        let tmp = format!("{}.{}", path, std::process::id());
-        let _ = std::fs::write(&tmp, v[skip..].join("\n") + "\n").and_then(|_| std::fs::rename(&tmp, &path));
+        // temp name per plugin instance (the process pid is not available on wasm32-wasip1: it panics)
+        let tmp = format!("{}.{}", path, self.my_id);
+        let _ = std::fs::write(&tmp, recent_body(self.read_recent(), name)).and_then(|_| std::fs::rename(&tmp, &path));
     }
 
     // xorshift64*, seeded from the clock; [0,1)
@@ -881,6 +894,9 @@ impl State {
             // among equally used characters prefer those that have sound clips
             if cands.iter().any(|r| self.scanned.iter().any(|c| &c.1 == *r)) {
                 cands.retain(|r| self.scanned.iter().any(|c| &c.1 == *r));
+            }
+            if cands.is_empty() {
+                continue;
             }
             let nanos = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -2363,6 +2379,56 @@ mod tests {
         }
         for r in RACES.iter().filter_map(|r| r.3) {
             assert_eq!(r.chars().next().and_then(|c| c.width()), Some(2), "race icon {:?}", r);
+        }
+    }
+
+    #[test]
+    fn no_wasi_unsupported_std_calls() {
+        // these panic on wasm32-wasip1 although they work in host tests (process::id killed the leader)
+        let src = include_str!("main.rs");
+        let code = &src[..src.find("#[cfg(test)]").unwrap()];
+        for bad in ["process::id", "process::Command", "thread::spawn", "env::current_exe", "env::current_dir"] {
+            assert!(!code.contains(bad), "{} is unsupported on wasm32-wasip1", bad);
+        }
+    }
+
+    #[test]
+    fn recent_body_keeps_newest_16() {
+        assert_eq!(recent_body(vec![], "Šaman"), "Šaman\n");
+        let v: Vec<String> = (0..20).map(|i| format!("c{}", i)).collect();
+        let b = recent_body(v, "new");
+        let lines: Vec<&str> = b.lines().collect();
+        assert_eq!(lines.len(), 16);
+        assert_eq!(lines[0], "c5");
+        assert_eq!(*lines.last().unwrap(), "new");
+    }
+
+    #[test]
+    fn diversity_pick_is_total() {
+        // fuzz: random tab counts, excluded sets, recent lists, unknown names, extreme r; never panics,
+        // always returns a candidate when there is one
+        let defs = parse_characters(CHARACTERS_TSV);
+        let all: Vec<String> = defs.iter().map(|d| d.name.clone()).collect();
+        let mut rnd = sim_rng(0xBADC0DE);
+        assert_eq!(diverse_pick(&defs, &[], &[], &[], 0.5), None);
+        assert_eq!(diverse_pick(&defs, &["nobody".into()], &[("nobody".into(), 1)], &[], 0.99), Some("nobody".into()));
+        for _ in 0..20000 {
+            let tabs = 1 + (rnd() * 12.0) as usize;
+            let ctx: Vec<(String, usize)> = (0..tabs - 1)
+                .map(|i| (all[(rnd() * all.len() as f64) as usize].clone(), (i % 4) as usize))
+                .collect();
+            let keep = rnd();
+            let mut cands: Vec<String> = all.iter().filter(|_| rnd() < keep).cloned().collect();
+            if rnd() < 0.1 {
+                cands.push("-".into());
+            }
+            let recent: Vec<String> = (0..(rnd() * 20.0) as usize).map(|_| all[(rnd() * all.len() as f64) as usize].clone()).collect();
+            let r = [0.0, 0.999_999_999, 1.0, -1.0, f64::NAN, rnd()][(rnd() * 6.0) as usize];
+            let got = diverse_pick(&defs, &cands, &ctx, &recent, r);
+            assert_eq!(got.is_some(), !cands.is_empty());
+            if let Some(g) = got {
+                assert!(cands.contains(&g));
+            }
         }
     }
 }

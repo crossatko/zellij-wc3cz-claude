@@ -234,6 +234,16 @@ written blind.
   0 adjacent hard clashes, adjacent same-theme 20 vs 255 for uniform random, races 291/955/490/860/777/887/737
   (demon/human/naga/neutral/nightelf/orc/undead) vs 109/1192/223/889/781/1043/760. NOT verified in a live
   session. Existing tabs are never reassigned; `claude_race`/`claude_character` pipes are unchanged.
+- Fixed 2026-10-21 (leader panic): the first build of this wrote `recent-characters` via a temp file named
+  with `std::process::id()`, which panics on wasm32-wasip1 ("no pids on this platform",
+  std `sys/process/unsupported.rs`). Host `cargo test` cannot catch it. The first assignment after the
+  reload (a `reshuffle`) killed the leader right after `tab 0 -> <name>`: tabs 1+ were left unassigned and
+  every later event failed ("ERROR IN PLUGIN"). Fix: temp name = plugin id (like the `.agents` files).
+  Also `diverse_pick` falls back to a uniform pick on a zero/NaN weight total and `assign_chars` skips an
+  empty candidate set. Tests: `no_wasi_unsupported_std_calls` (source guard: no process::id/Command/
+  thread::spawn/env::current_exe|dir outside tests), `recent_body_keeps_newest_16`, `diversity_pick_is_total`
+  (20000 fuzzed inputs). Verified: the panic string is in the old wasm and absent from the new one; leader
+  alive after the hot reload. A dead instance only recovers with a reload (`dev.sh`).
   `claude-ctl.sh character <name>` / `race <race>` / `ding [character]` / `reshuffle`; pipe names
   `claude_character`, `claude_race`, `claude_ding`. play-phrase.sh matches `"<Character> - "*` in all race
   folders; a character without clips plays any clip; nothing = exit 3. The library is rescanned every 30 s
@@ -442,6 +452,8 @@ written blind.
 - Open: the Known issues above; test on a Mac and other desktops/terminals; Bluetooth wake-up clipping of the first ms
   of a voice line is an untested hypothesis (try `lead_in_ms`).
 - Tests: `sh tests/subagents.sh` (hook/agents scripts, private TMPDIR, stub zellij), `cargo test` (wasm).
+  `cargo test` runs on the host: std calls that panic only under WASI (process ids, threads, Command) are
+  caught only by the `no_wasi_unsupported_std_calls` source guard; extend its list when adding std calls.
 - Resume: `sh setup.sh` (status), `./dev.sh -s <isolated session>` (build + reload), `claude plugin
   validate .`; rebuild and commit the wasm after every source change.
 - Install audit (Linux, kitty, checkout + Claude Code plugin both present): hooks only via the plugin (cache dir =
