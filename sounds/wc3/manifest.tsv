@@ -79,7 +79,7 @@ human/Kael'thas Sunstrider - Z mého domova zbyly jen trosky a popel.flac	active
 human/Kněz - Copak vás trápí.flac	active		human	Kněz	Copak vás trápí?	1.41	AEegxMtZuQw	human	126.32	127.73	-20.33	-2.0	
 human/Kněz - Je snad někdo zraněn.flac	active		human	Kněz	Je snad někdo zraněn?	1.79	AEegxMtZuQw	human	124.23	126.02	-20.0	-3.84	
 human/Kněz - Mohu nějak pomoci.flac	active		human	Kněz	Mohu nějak pomoci?	1.65	AEegxMtZuQw	human	122.23	123.88	-20.0	-3.6	transcript reconstructed,retx_wer0.67,first_word?
-_excluded/human/Kněz - Možné vedlejší účinky jsou sucho v ústech, nevolnost, zvracení.flac	excluded	too long	human	Kněz	Možné vedlejší účinky jsou sucho v ústech, nevolnost, zvracení, zadržování vody, bolestivé svědění konečníků, halucinace, slabomyslnost, psychóza, bezvědomí, smrt a zápach z úst. Před použitím se poradíte se svým lékařem.	11.72	AEegxMtZuQw	human	142.2	153.92	-20.0	-2.3	long
+human/Kněz - Možné vedlejší účinky jsou sucho v ústech, nevolnost, zvracení.flac	active		human	Kněz	Možné vedlejší účinky jsou sucho v ústech, nevolnost, zvracení, zadržování vody, bolestivé svědění konečníků, halucinace, slabomyslnost, psychóza, bezvědomí, smrt a zápach z úst. Před použitím se poradíte se svým lékařem.	11.72	AEegxMtZuQw	human	142.2	153.92	-20.0	-2.3	long
 human/Kněz - Můžeme!.flac	active		human	Kněz	Můžeme!	0.71	AEegxMtZuQw	human	133.11	133.82	-20.0	-6.99	
 human/Kněz - Přejděte, děti.flac	active		human	Kněz	Přejděte, děti.	1.22	AEegxMtZuQw	human	133.94	135.16	-20.0	-4.46	
 human/Kněz - Přicházím, abych očistil tuto zemi.flac	active		human	Kněz	Přicházím, abych očistil tuto zemi.	2.41	AEegxMtZuQw	human	119.73	122.14	-20.0	-2.03	
@@ -108,7 +108,7 @@ human/Lapač kouzel - Žízním po magii.flac	active		human	Lapač kouzel	Žízn
 human/Lord Garithos - Kdo není člověk, nemá právo žít.flac	active		human	Lord Garithos	Kdo není člověk, nemá právo žít.	3.13	PBJ7qefqw6I	heroes	157.45	160.58	-20.0	-4.8	
 human/Lord Garithos - Lidem hrozí zkáza.flac	active		human	Lord Garithos	Lidem hrozí zkáza.	2.46	PBJ7qefqw6I	heroes	143.34	145.8	-20.0	-5.2	
 human/Lord Garithos - Musíme očistit království od nižších ras.flac	active		human	Lord Garithos	Musíme očistit království od nižších ras.	3.81	PBJ7qefqw6I	heroes	153.62	157.43	-20.0	-3.29	
-_excluded/human/Lord Garithos - Má-li něco být uděláno správně, musí to udělat lidé. Nikdy.flac	excluded	too long	human	Lord Garithos	Má-li něco být uděláno správně, musí to udělat lidé. Nikdy nevěř elfovi.	8.17	PBJ7qefqw6I	heroes	160.73	168.9	-20.0	-5.12	
+human/Lord Garithos - Má-li něco být uděláno správně, musí to udělat lidé. Nikdy.flac	active		human	Lord Garithos	Má-li něco být uděláno správně, musí to udělat lidé. Nikdy nevěř elfovi.	8.17	PBJ7qefqw6I	heroes	160.73	168.9	-20.0	-5.12	
 human/Lord Garithos - Na co čekáme.flac	active		human	Lord Garithos	Na co čekáme?	1.04	PBJ7qefqw6I	heroes	149.0	150.04	-20.0	-2.65	
 human/Lord Garithos - Nerad pracuji s těmito lidmi.flac	active		human	Lord Garithos	Nerad pracuji s těmito lidmi.	3.01	PBJ7qefqw6I	heroes	145.83	148.84	-20.02	-2.02	
 human/Lord Garithos - Tyto nelidské stvůry musí zahynout.flac	active		human	Lord Garithos	Tyto nelidské stvůry musí zahynout.	3.51	PBJ7qefqw6I	heroes	150.11	153.62	-20.0	-6.74	
@@ -230,7 +230,7 @@ naga/Naga royal guard - Přesvědčně.flac	active		naga	Naga royal guard	Přesv
 naga/Naga royal guard - Přicházím z temných hlubin.flac	active		naga	Naga royal guard	Přicházím z temných hlubin.	3.57	O1KEK7Ahrfc	naga	119.08	122.65	-20.0	-2.98	first 'Přicházím z temných hlubin' text fixed ('velubin'),excluded_audio_after123.20-123.48
 naga/Naga royal guard - Příliv se zvedá.flac	active		naga	Naga royal guard	Příliv se zvedá.	1.95	O1KEK7Ahrfc	naga	128.2	130.15	-20.0	-4.84	
 naga/Naga royal guard - Tenhle svět bude patřit mně a já začnu plaveckými bazény.flac	active		naga	Naga royal guard	Tenhle svět bude patřit mně a já začnu plaveckými bazény.	6.04	O1KEK7Ahrfc	naga	144.0	150.04	-20.32	-2.0	
-_excluded/naga/Naga royal guard - V hlubině tvůj křik nikdo neuslyší. Tedy, možná jo, ale bude.flac	excluded	too long	naga	Naga royal guard	V hlubině tvůj křik nikdo neuslyší. Tedy, možná jo, ale bude to jen takové muhlání.	9.77	O1KEK7Ahrfc	naga	130.41	140.18	-20.31	-2.0	last word unclear ('muhlání')
+naga/Naga royal guard - V hlubině tvůj křik nikdo neuslyší. Tedy, možná jo, ale bude.flac	active		naga	Naga royal guard	V hlubině tvůj křik nikdo neuslyší. Tedy, možná jo, ale bude to jen takové muhlání.	9.77	O1KEK7Ahrfc	naga	130.41	140.18	-20.31	-2.0	last word unclear ('muhlání')
 naga/Naga royal guard - Žádná župa se neubrání naší celosvětové nadvládě.flac	active		naga	Naga royal guard	Žádná župa se neubrání naší celosvětové nadvládě.	4.76	O1KEK7Ahrfc	naga	150.21	154.97	-20.82	-2.0	
 naga/Naga siren - Chceš cítit, jaké to je, dostat sprškou mořské vody do obličeje.flac	active		naga	Naga siren	Chceš cítit, jaké to je, dostat sprškou mořské vody do obličeje?	5.05	O1KEK7Ahrfc	naga	29.74	34.79	-20.0	-2.89	
 naga/Naga siren - Děláš to záměrně, nebo je to jen náhoda.flac	active		naga	Naga siren	Děláš to záměrně, nebo je to jen náhoda?	3.22	O1KEK7Ahrfc	naga	20.78	24.0	-20.64	-2.0	
@@ -256,7 +256,7 @@ neutral/Akama - Jak vám mohu pomoci.flac	active		neutral	Akama	Jak vám mohu po
 neutral/Akama - Mé síly jsou k vašim službám.flac	active		neutral	Akama	Mé síly jsou k vašim službám.	2.75	sNqsoCc0pto	neutral	561.45	564.2	-20.0	-5.75	
 neutral/Akama - Na tohle jsem už příliš starý.flac	active		neutral	Akama	Na tohle jsem už příliš starý.	2.81	sNqsoCc0pto	neutral	583.41	586.22	-20.0	-3.81	excluded_audio_after586.59-587.89
 neutral/Akama - Naše cesty se spojují.flac	active		neutral	Akama	Naše cesty se spojují.	2.21	sNqsoCc0pto	neutral	564.26	566.47	-20.0	-3.86	
-_excluded/neutral/Akama - Orkové povraždili můj lid a magie jejich démonů pohltila náš svět, my.flac	excluded	too long	neutral	Akama	Orkové povraždili můj lid a magie jejich démonů pohltila náš svět, my tu zůstali, abychom uchopili, co ještě zbylo ze života a cti v popelu našich dějin.	14.18	sNqsoCc0pto	neutral	566.58	580.76	-20.03	-2.27	long
+neutral/Akama - Orkové povraždili můj lid a magie jejich démonů pohltila náš svět, my.flac	active		neutral	Akama	Orkové povraždili můj lid a magie jejich démonů pohltila náš svět, my tu zůstali, abychom uchopili, co ještě zbylo ze života a cti v popelu našich dějin.	14.18	sNqsoCc0pto	neutral	566.58	580.76	-20.03	-2.27	long
 neutral/Akama - Poskytnu vám své vědění.flac	active		neutral	Akama	Poskytnu vám své vědění.	2.69	sNqsoCc0pto	neutral	607.02	609.71	-20.0	-2.33	unclear
 neutral/Akama - Slibuji věrnost.flac	active		neutral	Akama	Slibuji věrnost.	1.98	sNqsoCc0pto	neutral	557.2	559.18	-20.0	-8.64	retx_wer0.50
 neutral/Akama - Smrt umím bojovat jako.flac	active		neutral	Akama	Smrt umím bojovat jako...	2.91	sNqsoCc0pto	neutral	591.75	594.66	-20.0	-4.02	unclear
@@ -308,7 +308,7 @@ neutral/Elfí Pracovník - Nechte mě to udělat.flac	active		neutral	Elfí Prac
 neutral/Elfí Pracovník - Podívej, já jsem stavebník. Můj čas je drahý.flac	active		neutral	Elfí Pracovník	Podívej, já jsem stavebník. Můj čas je drahý.	2.82	sNqsoCc0pto	neutral	240.93	243.75	-20.0	-2.25	
 neutral/Elfí Pracovník - Proč neobtěžuješ někoho jiného tím svým neustálým klepáním myší.flac	active		neutral	Elfí Pracovník	Proč neobtěžuješ někoho jiného tím svým neustálým klepáním myší?	3.71	sNqsoCc0pto	neutral	243.8	247.51	-20.45	-2.0	
 neutral/Elfí Pracovník - Přerušil jsi mé výpočty. 2 plus 3 krát 12... co si chtěl.flac	active		neutral	Elfí Pracovník	Přerušil jsi mé výpočty. 2 plus 3 krát 12... co si chtěl?	4.84	sNqsoCc0pto	neutral	233.17	238.01	-21.01	-2.0	
-_excluded/neutral/Elfí Pracovník - Čibum, a stojí tu nová věž. Bude to v cukuletu, je úřední.flac	excluded	too long	neutral	Elfí Pracovník	Čibum, a stojí tu nová věž. Bude to v cukuletu, je úřední termín Spojené unie stavebníků Krvavých elfů, který nelze interpretovat jako logický odhad skutečného času, který zabere dokončení úkolu nějakým způsobem, tvarem nebo formou.	13.96	sNqsoCc0pto	neutral	257.54	271.5	-21.42	-2.0	'v Cukuletu' unclear,long,first_word?
+neutral/Elfí Pracovník - Čibum, a stojí tu nová věž. Bude to v cukuletu, je úřední.flac	active		neutral	Elfí Pracovník	Čibum, a stojí tu nová věž. Bude to v cukuletu, je úřední termín Spojené unie stavebníků Krvavých elfů, který nelze interpretovat jako logický odhad skutečného času, který zabere dokončení úkolu nějakým způsobem, tvarem nebo formou.	13.96	sNqsoCc0pto	neutral	257.54	271.5	-21.42	-2.0	'v Cukuletu' unclear,long,first_word?
 neutral/Firelord - Hej, to nebylo moc legrační.flac	active		neutral	Firelord	Hej, to nebylo moc legrační.	1.75	sNqsoCc0pto	neutral	433.74	435.49	-20.0	-3.11	
 neutral/Firelord - Jsem pán všeho ohně.flac	active		neutral	Firelord	Jsem pán všeho ohně.	5.49	sNqsoCc0pto	neutral	428.08	433.57	-20.0	-2.65	
 neutral/Firelord - Mám takovou žízeň.flac	active		neutral	Firelord	Mám takovou žízeň.	3.73	sNqsoCc0pto	neutral	423.91	427.64	-20.0	-4.48	
@@ -323,7 +323,7 @@ _excluded/neutral/Firelord - všechno spotrdím.flac	excluded	garbled/unintellig
 neutral/Kapitán - Jaké je vaše přání.flac	active		neutral	Kapitán	Jaké je vaše přání?	1.54	sNqsoCc0pto	neutral	198.68	200.22	-20.0	-4.38	
 neutral/Kapitán - Jsem připraven.flac	active		neutral	Kapitán	Jsem připraven.	1.17	sNqsoCc0pto	neutral	200.27	201.44	-20.0	-3.7	
 neutral/Kapitán - Přicházím, abych očistil tuto zemi.flac	active		neutral	Kapitán	Přicházím, abych očistil tuto zemi.	2.45	sNqsoCc0pto	neutral	196.08	198.53	-20.01	-2.05	
-_excluded/neutral/Kapitán - Raději jsem se měl stát farmářem, jak si to přál můj otec. Mizerný.flac	excluded	too long	neutral	Kapitán	Raději jsem se měl stát farmářem, jak si to přál můj otec. Mizerný plat, neustále v nebezpečí, aspoň jsem se dostal ke dvoru.	8.87	sNqsoCc0pto	neutral	201.44	210.31	-20.01	-2.02	
+neutral/Kapitán - Raději jsem se měl stát farmářem, jak si to přál můj otec. Mizerný.flac	active		neutral	Kapitán	Raději jsem se měl stát farmářem, jak si to přál můj otec. Mizerný plat, neustále v nebezpečí, aspoň jsem se dostal ke dvoru.	8.87	sNqsoCc0pto	neutral	201.44	210.31	-20.01	-2.02	
 neutral/Ledoví trollové - Hm, hm, hm, co to bude.flac	active		neutral	Ledoví trollové	Hm, hm, hm, co to bude?	4.06	sNqsoCc0pto	neutral	55.61	59.67	-20.45	-2.0	retx_wer0.50,first_word?
 neutral/Ledoví trollové - Ledově svěží.flac	active		neutral	Ledoví trollové	Ledově svěží,	2.22	sNqsoCc0pto	neutral	53.32	55.54	-20.0	-3.16	
 neutral/Ledoví trollové - Pro tebe i zabiju.flac	active		neutral	Ledoví trollové	Pro tebe i zabiju.	1.66	sNqsoCc0pto	neutral	51.05	52.71	-20.0	-3.61	
@@ -343,14 +343,14 @@ neutral/Ogrové - Já jsem Reddy. Mně říkají Stoupa.flac	active		neutral	Ogr
 neutral/Ogrové - Mám zlost! Mám hlad.flac	active		neutral	Ogrové	Mám zlost! Mám hlad?	3.29	sNqsoCc0pto	neutral	12.07	15.36	-20.0	-7.29	
 neutral/Ogrové - Na co to koukáš.flac	active		neutral	Ogrové	Na co to koukáš?	3.15	sNqsoCc0pto	neutral	8.56	11.71	-20.0	-5.26	
 neutral/Ogrové - Tak tudy! Ne! Tudy!.flac	active		neutral	Ogrové	Tak tudy! Ne! Tudy!	2.88	sNqsoCc0pto	neutral	15.73	18.61	-20.0	-5.7	
-_excluded/neutral/Pit Lord - Cože, tomu nerozumím. Myslela jsem, že děláš poštovního.flac	excluded	too long	neutral	Pit Lord	Cože, tomu nerozumím. Myslela jsem, že děláš poštovního doručovatele. To jo, ale za úplňku.	8.8	sNqsoCc0pto	neutral	502.82	511.62	-20.0	-3.23	
+_excluded/neutral/Pit Lord - Cože, tomu nerozumím. Myslela jsem, že děláš poštovního.flac	excluded	held: only reason was length (owner to decide)	neutral	Pit Lord	Cože, tomu nerozumím. Myslela jsem, že děláš poštovního doručovatele. To jo, ale za úplňku.	8.8	sNqsoCc0pto	neutral	502.82	511.62	-20.0	-3.23	
 _excluded/neutral/Pit Lord - Hej, hej, hej!.flac	excluded	owner edit	neutral	Pit Lord	Hej, hej, hej!	1.98	sNqsoCc0pto	neutral	457.7	459.68	-20.0	-8.33	
 _excluded/neutral/Pit Lord - Hraaa!.flac	excluded	owner edit	neutral	Pit Lord	Hraaa!	2.92	sNqsoCc0pto	neutral	464.82	467.74	-20.0	-7.86	
 _excluded/neutral/Pit Lord - Jaký je tvůj ubohý požadavek.flac	excluded	owner edit	neutral	Pit Lord	Jaký je tvůj ubohý požadavek?	3.56	sNqsoCc0pto	neutral	445.88	449.44	-20.0	-3.9	
 _excluded/neutral/Pit Lord - Je to tak, jsem pán.flac	excluded	owner edit	neutral	Pit Lord	Je to tak, jsem pán.	2.48	sNqsoCc0pto	neutral	499.95	502.43	-20.0	-3.17	
 _excluded/neutral/Pit Lord - Jsem démon.flac	excluded	owner edit	neutral	Pit Lord	Jsem démon.	2.59	sNqsoCc0pto	neutral	494.91	497.5	-20.42	-2.0	'Jsem démon.' second pass 'Huf, sem jdem.',retx_wer1.00,last_word?
 _excluded/neutral/Pit Lord - Jsme tu s Malvengerotem, nočním lovcem, a jeho přítelkyní Kim. Teď.flac	excluded	owner edit	neutral	Pit Lord	Jsme tu s Malvengerotem, nočním lovcem, a jeho přítelkyní Kim. Teď Kim.	5.77	sNqsoCc0pto	neutral	476.41	482.18	-20.0	-2.01	dating-show sketch (147-153, 34 s) kept in 6 parts, not one 34 s line
-_excluded/neutral/Pit Lord - Malé, proč nám neřekneš, proč jsi tu doopravdy Dobrá, Kim Cake.flac	excluded	too long	neutral	Pit Lord	Malé, proč nám neřekneš, proč jsi tu doopravdy? Dobrá, Kim Cake, miluji tě, ale musím ti něco říct.	8.73	sNqsoCc0pto	neutral	485.91	494.64	-20.21	-2.0	
+_excluded/neutral/Pit Lord - Malé, proč nám neřekneš, proč jsi tu doopravdy Dobrá, Kim Cake.flac	excluded	held: only reason was length (owner to decide)	neutral	Pit Lord	Malé, proč nám neřekneš, proč jsi tu doopravdy? Dobrá, Kim Cake, miluji tě, ale musím ti něco říct.	8.73	sNqsoCc0pto	neutral	485.91	494.64	-20.21	-2.0	
 _excluded/neutral/Pit Lord - Myslím, že mě někdo uvízl mezi zuby.flac	excluded	owner edit	neutral	Pit Lord	Myslím, že mě někdo uvízl mezi zuby.	3.28	sNqsoCc0pto	neutral	454.25	457.53	-20.0	-3.99	
 _excluded/neutral/Pit Lord - Myslím, že tady to bude chtít trochu šikovnosti.flac	excluded	owner edit	neutral	Pit Lord	Myslím, že tady to bude chtít trochu šikovnosti.	5.02	sNqsoCc0pto	neutral	459.78	464.8	-20.26	-2.0	
 _excluded/neutral/Pit Lord - Nepřijď tvojím časem.flac	excluded	owner edit	neutral	Pit Lord	Nepřijď tvojím časem.	2.82	sNqsoCc0pto	neutral	440.13	442.95	-20.0	-2.39	unclear,retx_wer1.00,first_word?
@@ -541,7 +541,7 @@ nightelf/Měsíční kněžka - Válečníci všech nocí, spojte se!.flac	activ
 nightelf/Strážce lesa - Dávej si pozor, ať nenarazíš na Jelena, až poletíš ze dveří.flac	active		nightelf	Strážce lesa	Dávej si pozor, ať nenarazíš na Jelena, až poletíš ze dveří.	6.69	-2xaTcqKpeQ	nightelf	266.83	273.52	-20.0	-5.05	
 nightelf/Strážce lesa - Je cítit přírodou připraven tradičním způsobem.flac	active		nightelf	Strážce lesa	Je cítit přírodou připraven tradičním způsobem.	3.93	-2xaTcqKpeQ	nightelf	262.72	266.65	-20.0	-3.54	
 nightelf/Strážce lesa - Kdo ohrožuje divočinu.flac	active		nightelf	Strážce lesa	Kdo ohrožuje divočinu?	2.02	-2xaTcqKpeQ	nightelf	256.65	258.67	-20.21	-2.02	
-_excluded/nightelf/Strážce lesa - Když zautočím, třetí část, volné jízdy, pro dámy, jak se ti.flac	excluded	garbled/unintelligible-suspect;too long	nightelf	Strážce lesa	Když zautočím, třetí část, volné jízdy, pro dámy, jak se ti vede, stádo?	8.74	-2xaTcqKpeQ	nightelf	273.7	282.44	-20.0	-2.8	transcript garbled
+_excluded/nightelf/Strážce lesa - Když zautočím, třetí část, volné jízdy, pro dámy, jak se ti.flac	excluded	garbled/unintelligible-suspect	nightelf	Strážce lesa	Když zautočím, třetí část, volné jízdy, pro dámy, jak se ti vede, stádo?	8.74	-2xaTcqKpeQ	nightelf	273.7	282.44	-20.0	-2.8	transcript garbled
 nightelf/Strážce lesa - Můj otec visel nad krbem v jednom srubu.flac	active		nightelf	Strážce lesa	Můj otec visel nad krbem v jednom srubu.	3.55	-2xaTcqKpeQ	nightelf	258.94	262.49	-20.0	-5.32	
 nightelf/Strážce lesa - Můžeš poroučet.flac	active		nightelf	Strážce lesa	Můžeš poroučet.	1.41	-2xaTcqKpeQ	nightelf	253.11	254.52	-20.0	-2.23	
 nightelf/Strážce lesa - Příroda je neklidná.flac	active		nightelf	Strážce lesa	Příroda je neklidná.	1.8	-2xaTcqKpeQ	nightelf	254.52	256.32	-20.0	-4.1	
@@ -612,7 +612,7 @@ orc/Pán mečů - Masabi! Oh!.flac	active		orc	Pán mečů	Masabi! Oh!	1.56	oPpD
 orc/Pán mečů - Má čepel dokáže projít brněním a přitom rozkrájí i rajče.flac	active		orc	Pán mečů	Má čepel dokáže projít brněním a přitom rozkrájí i rajče.	4.04	oPpDkTSLCDw	orc	316.27	320.31	-20.0	-4.76	
 orc/Pán mečů - Má čepel prahne po pomstě.flac	active		orc	Pán mečů	Má čepel prahne po pomstě.	2.02	oPpDkTSLCDw	orc	308.21	310.23	-20.0	-5.12	first_word?
 orc/Pán mečů - Oh, jsem váš!.flac	active		orc	Pán mečů	Oh, jsem váš!	1.92	oPpDkTSLCDw	orc	310.7	312.62	-20.0	-6.19	
-_excluded/orc/Přízračný chodec - Ano, duchové ke mně promlouvají. Ano, promlouvají... a.flac	excluded	too long	orc	Přízračný chodec	Ano, duchové ke mně promlouvají. Ano, promlouvají... a začínají se zhmotňovat. Už je skoro vidím. Dnes jsou duchové skutečně silní.	21.32	oPpDkTSLCDw	orc	182.26	203.58	-20.0	-4.58	long,retx_wer1.00,first_word?,last_word?
+orc/Přízračný chodec - Ano, duchové ke mně promlouvají. Ano, promlouvají... a.flac	active		orc	Přízračný chodec	Ano, duchové ke mně promlouvají. Ano, promlouvají... a začínají se zhmotňovat. Už je skoro vidím. Dnes jsou duchové skutečně silní.	21.32	oPpDkTSLCDw	orc	182.26	203.58	-20.0	-4.58	long,retx_wer1.00,first_word?,last_word?
 orc/Přízračný chodec - Co tě trápí.flac	active		orc	Přízračný chodec	Co tě trápí?	1.66	oPpDkTSLCDw	orc	158.39	160.05	-20.0	-3.45	
 orc/Přízračný chodec - Jednoho dne se z vás zblázním.flac	active		orc	Přízračný chodec	Jednoho dne se z vás zblázním.	3.07	oPpDkTSLCDw	orc	171.42	174.49	-20.0	-5.56	
 orc/Přízračný chodec - Mé kopito a tvá hlava si musí popovídat.flac	active		orc	Přízračný chodec	Mé kopito a tvá hlava si musí popovídat.	3.74	oPpDkTSLCDw	orc	174.6	178.34	-20.0	-6.04	
@@ -718,7 +718,7 @@ orc/Žump - Vážně je mi líto, že nemáte do čeho píchnout.flac	active		or
 orc/Žump - Za hordu život položím.flac	active		orc	Žump	Za hordu život položím.	1.96	oPpDkTSLCDw	orc	20.28	22.24	-20.0	-4.89	
 orc/Žump - Ó, to bylo velmi příjemné.flac	active		orc	Žump	Ó, to bylo velmi příjemné.	3.76	oPpDkTSLCDw	orc	35.07	38.83	-20.0	-6.11	first_word?
 undead/Akolyta - Ach, spadla mi kápě.flac	active		undead	Akolyta	Ach, spadla mi kápě.	1.6	sLkKiVIYsbk	undead	19.03	20.63	-20.0	-2.92	
-_excluded/undead/Akolyta - Chtěl byste znát tajemství věčného štěstí Jakmile se jednou vydáte na.flac	excluded	too long	undead	Akolyta	Chtěl byste znát tajemství věčného štěstí? Jakmile se jednou vydáte na temnou cestu, ovládne toto rozhodnutí celý váš další osud. A navíc získáte pojistku.	11.22	sLkKiVIYsbk	undead	29.5	40.72	-20.71	-2.0	excluded_audio_after41.25-45.21,long
+undead/Akolyta - Chtěl byste znát tajemství věčného štěstí Jakmile se jednou vydáte na.flac	active		undead	Akolyta	Chtěl byste znát tajemství věčného štěstí? Jakmile se jednou vydáte na temnou cestu, ovládne toto rozhodnutí celý váš další osud. A navíc získáte pojistku.	11.22	sLkKiVIYsbk	undead	29.5	40.72	-20.71	-2.0	excluded_audio_after41.25-45.21,long
 undead/Akolyta - Jedině smrt očistí svět.flac	active		undead	Akolyta	Jedině smrt očistí svět.	2.17	sLkKiVIYsbk	undead	14.99	17.16	-20.27	-2.0	
 undead/Akolyta - Kde má být prolita krev.flac	active		undead	Akolyta	Kde má být prolita krev?	1.79	sLkKiVIYsbk	undead	10.71	12.5	-20.71	-2.0	
 undead/Akolyta - Můj život za Ner'zhula.flac	active		undead	Akolyta	Můj život za Ner'zhula.	1.74	sLkKiVIYsbk	undead	7.16	8.9	-20.0	-4.31	retx_wer0.50,last_word?
@@ -798,7 +798,7 @@ undead/Smrtonožka - Buď zdráv.flac	active		undead	Smrtonožka	Buď zdráv.	2.
 undead/Smrtonožka - Co musím udělat.flac	active		undead	Smrtonožka	Co musím udělat?	2.94	sLkKiVIYsbk	undead	148.43	151.37	-20.0	-5.34	retx_wer0.67,first_word?
 undead/Smrtonožka - Jak dlouho budu ještě trpět.flac	active		undead	Smrtonožka	Jak dlouho budu ještě trpět?	4.07	sLkKiVIYsbk	undead	164.33	168.4	-20.0	-4.58	retx_wer1.00,first_word?,last_word?
 undead/Smrtonožka - Kdy tahle muka skončí.flac	active		undead	Smrtonožka	Kdy tahle muka skončí?	4.11	sLkKiVIYsbk	undead	155.25	159.36	-20.0	-5.47	
-_excluded/undead/Smrtonožka - N-E-M-R-T-V-Í. Hádej, jak se promění.flac	excluded	too long	undead	Smrtonožka	N-E-M-R-T-V-Í. Hádej, jak se promění.	9.87	sLkKiVIYsbk	undead	169.02	178.89	-20.0	-4.09	
+undead/Smrtonožka - N-E-M-R-T-V-Í. Hádej, jak se promění.flac	active		undead	Smrtonožka	N-E-M-R-T-V-Í. Hádej, jak se promění.	9.87	sLkKiVIYsbk	undead	169.02	178.89	-20.0	-4.09	
 undead/Smrtonožka - Nechť se mým křikem rozechvěje vše živé!.flac	active		undead	Smrtonožka	Nechť se mým křikem rozechvěje vše živé!	5.54	sLkKiVIYsbk	undead	140.08	145.62	-20.0	-5.17	transcript partly reconstructed
 undead/Smrtonožka - Tady není žádná smrtonožka, tady je Zuul.flac	active		undead	Smrtonožka	Tady není žádná smrtonožka, tady je Zuul.	5.82	sLkKiVIYsbk	undead	178.95	184.77	-20.01	-2.05	last_word?
 undead/Smrtonožka - Tvá duše se bude smažit.flac	active		undead	Smrtonožka	Tvá duše se bude smažit.	4.23	sLkKiVIYsbk	undead	159.84	164.07	-20.0	-3.42	last_word?
