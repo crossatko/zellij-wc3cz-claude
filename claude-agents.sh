@@ -7,8 +7,9 @@
 #   TaskStop or by the user never sends SubagentStop).
 # Source of truth is the per-agent transcript agent-<id>.jsonl. An agent is finished when its last message
 # record (type user or assistant) is an assistant message with stop_reason end_turn, stop_sequence or
-# refusal, or a user record "[Request interrupted by user...]" (TaskStop / killed by the user: no
-# SubagentStop follows); anything else (tool_use, null = mid-stream, max_tokens, a user/tool_result line, a resumed agent's
+# refusal, a user record "[Request interrupted by user...]" (TaskStop / killed by the user: no
+# SubagentStop follows), or the tool_result of a SubagentHandback tool call (Claude Code 2.1.301+: an agent
+# can end by handing its report back with that tool, no end_turn follows); anything else (tool_use, null = mid-stream, max_tokens, a user/tool_result line, a resumed agent's
 # new user line), modified within the last 10 minutes, is running. Other records (api-request, attachment,
 # prompt_snapshot, system, ...) are skipped: newer Claude Code versions append them after the final
 # assistant message, so the LAST LINE is not reliable. Bounded: only the 40 newest files of the last 30 min,
@@ -22,10 +23,12 @@ agent_state() {
     /"type" *: *"assistant"/ && /"role" *: *"assistant"/ {
       s = "run"
       if ($0 ~ /"stop_reason" *: *"(end_turn|stop_sequence|refusal)"/) s = "done"
+      else if ($0 ~ /"type" *: *"tool_use"/ && $0 ~ /"name" *: *"SubagentHandback"/) s = "hb"
       next
     }
-    /"type" *: *"user"/ { s = ($0 ~ /"text" *: *"\[Request interrupted by user/) ? "done" : "run" }
-    END { print (s == "" ? "none" : s) }'
+    # the tool_result of a SubagentHandback call ends the agent (no end_turn message follows)
+    /"type" *: *"user"/ { s = ($0 ~ /"text" *: *"\[Request interrupted by user/ || (s == "hb" && $0 ~ /"type" *: *"tool_result"/)) ? "done" : "run" }
+    END { print (s == "" ? "none" : (s == "hb" ? "run" : s)) }'
 }
 # finished = done, also when the last 16 lines hold no message record
 finished() {

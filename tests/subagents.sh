@@ -21,6 +21,9 @@ done_rec='{"type":"assistant","message":{"role":"assistant","stop_reason":"end_t
 intr_rec='{"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user]"}]}}'
 run_rec='{"type":"assistant","message":{"role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","name":"Bash"}]}}'
 tail_rec='{"type":"api-request","requestId":"x"}'
+hb_rec='{"type":"assistant","message":{"role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","name":"SubagentHandback","input":{"message":"report"}}]}}'
+hb_res='{"type":"user","message":{"role":"user","content":[{"tool_use_id":"t1","type":"tool_result","content":[{"type":"text","text":"{\\"success\\":true}"}]}]}}'
+resume_rec='{"type":"user","message":{"role":"user","content":"follow-up"}}'
 transcript() { printf '%s\n%s\n' "$2" "$tail_rec" >"$sa/agent-$1.jsonl"; }
 
 hook start "{$tp}"
@@ -55,4 +58,12 @@ hook substop "{$tp,\"agent_id\":\"h1\",\"agent_type\":\"\"}"
 ok "helper SubagentStop does not touch .ev" '[ ! -e "$f.ev" ]'
 hook substop "{$tp,\"agent_id\":\"a3\",\"agent_type\":\"general-purpose\"}"
 ok "SubagentStop of a known agent touches .ev and drops its marker" '[ -e "$f.ev" ] && [ ! -e "$f.sub/a3" ]'
+# 6. an agent that ends by handing its report back (SubagentHandback tool call + its tool_result, no end_turn)
+printf '%s\n' "$hb_rec" >"$sa/agent-a6.jsonl"
+ok "claude-agents.sh: handback call in flight is running" 'sh "$here/claude-agents.sh" "$sa" | grep -qx a6'
+printf '%s\n%s\n%s\n' "$hb_rec" "$hb_res" "$tail_rec" >"$sa/agent-a6.jsonl"
+ok "claude-agents.sh: handed-back agent is finished" '! sh "$here/claude-agents.sh" "$sa" | grep -qx a6'
+printf '%s\n%s\n%s\n' "$hb_rec" "$hb_res" "$resume_rec" >"$sa/agent-a6.jsonl"
+ok "claude-agents.sh: handed-back agent resumed by a new message is running" 'sh "$here/claude-agents.sh" "$sa" | grep -qx a6'
+rm -f "$sa/agent-a6.jsonl"
 exit $fail
