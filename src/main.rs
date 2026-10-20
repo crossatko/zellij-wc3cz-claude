@@ -135,6 +135,9 @@ struct CharDef {
     glyph: Option<char>, // icon font codepoint; None when the character has no icon yet (race icon is used)
     ord: usize,          // index among the characters of its race
     of: usize,           // number of characters of its race
+    role: String,        // "hero" / "unit" / "" (unknown), for assignment diversity
+    sex: String,         // "m" / "f" / "" (unknown or a group)
+    theme: String,       // coarse voice/style family ("demon", "arcane", "troll", ...) or ""
 }
 
 // default plain_dim: plain bg luminance = median inactive Claude tab (test plain_matches_dimmed_claude_tabs)
@@ -154,7 +157,8 @@ fn parse_characters(tsv: &str) -> Vec<CharDef> {
         } else {
             None
         };
-        v.push(CharDef { race: f[0].trim().to_string(), name: f[1].trim().to_string(), glyph, ord: 0, of: 0 });
+        let meta = |i: usize| f.get(i).map(|x| x.trim()).filter(|x| *x != "-").unwrap_or("").to_string();
+        v.push(CharDef { race: f[0].trim().to_string(), name: f[1].trim().to_string(), glyph, ord: 0, of: 0, role: meta(5), sex: meta(6), theme: meta(7) });
     }
     let races: Vec<String> = v.iter().map(|c| c.race.clone()).collect();
     for i in 0..v.len() {
@@ -163,6 +167,87 @@ fn parse_characters(tsv: &str) -> Vec<CharDef> {
         v[i].of = same.len();
     }
     v
+}
+
+// Diversity of a new character against the characters already in the session (see assign_chars).
+// `ctx` = (character, tab distance to the new tab), `recent` = newest-last history of recent picks.
+// Penalty per live character: same race 1.0, same role 0.5, same sex 0.5, same theme 1.5 (unknown never
+// matches); x2 for the adjacent tab. Weight = 1 / (1 + penalty)^2, x0.4 when among the last 8 picks;
+// then divided by (candidates of its race)^0.5 so small races are not starved.
+const DIV_RACE: f64 = 1.0;
+const DIV_ROLE: f64 = 0.5;
+const DIV_SEX: f64 = 0.5;
+const DIV_THEME: f64 = 1.5;
+const DIV_ADJACENT: f64 = 2.0;
+const DIV_RECENT: f64 = 0.4;
+const DIV_RECENT_N: usize = 8;
+const DIV_FLATTEN: f64 = 0.5; // race-size exponent: weight / (candidates of the race)^0.5
+
+fn same(a: &str, b: &str) -> bool {
+    !a.is_empty() && a == b
+}
+
+// Hard rule for the adjacent tab: never the same race with the same role or the same theme.
+fn clashes_adjacent(a: &CharDef, b: &CharDef) -> bool {
+    a.race == b.race && (same(&a.role, &b.role) || same(&a.theme, &b.theme))
+}
+
+fn diversity_weight(defs: &[CharDef], cand: &str, ctx: &[(String, usize)], recent: &[String]) -> f64 {
+    let Some(c) = defs.iter().find(|d| d.name == cand) else { return 1.0 };
+    let mut pen = 0.0;
+    for (n, dist) in ctx {
+        let Some(o) = defs.iter().find(|d| d.name == *n) else { continue };
+        let mut p = 0.0;
+        if c.race == o.race {
+            p += DIV_RACE;
+        }
+        if same(&c.role, &o.role) {
+            p += DIV_ROLE;
+        }
+        if same(&c.sex, &o.sex) {
+            p += DIV_SEX;
+        }
+        if same(&c.theme, &o.theme) {
+            p += DIV_THEME;
+        }
+        pen += if *dist == 1 { p * DIV_ADJACENT } else { p };
+    }
+    let mut w = 1.0 / ((1.0 + pen) * (1.0 + pen));
+    if recent.iter().rev().take(DIV_RECENT_N).any(|r| r == cand) {
+        w *= DIV_RECENT;
+    }
+    w
+}
+
+// Weighted random choice among `cands`; `r` in [0,1). Adjacent clashes are dropped when anything else is left.
+fn diverse_pick(defs: &[CharDef], cands: &[String], ctx: &[(String, usize)], recent: &[String], r: f64) -> Option<String> {
+    let adj: Vec<&CharDef> = ctx.iter().filter(|c| c.1 == 1).filter_map(|c| defs.iter().find(|d| d.name == c.0)).collect();
+    let mut pool: Vec<&String> = cands
+        .iter()
+        .filter(|n| defs.iter().find(|d| d.name == **n).map_or(true, |d| !adj.iter().any(|a| clashes_adjacent(d, a))))
+        .collect();
+    if pool.is_empty() {
+        pool = cands.iter().collect();
+    }
+    // flatten the race sizes: a race's total weight grows with the square root of its candidates
+    // (21 human vs 2 demon characters would otherwise make demons a 1-in-45 event)
+    let race_of = |n: &String| defs.iter().find(|d| d.name == *n).map(|d| d.race.as_str()).unwrap_or("");
+    let ws: Vec<f64> = pool
+        .iter()
+        .map(|n| {
+            let k = pool.iter().filter(|m| race_of(m) == race_of(n)).count() as f64;
+            diversity_weight(defs, n, ctx, recent) / k.powf(DIV_FLATTEN)
+        })
+        .collect();
+    let total: f64 = ws.iter().sum();
+    let mut x = r.clamp(0.0, 0.999_999_9) * total;
+    for (n, w) in pool.iter().zip(&ws) {
+        if x < *w {
+            return Some((*n).clone());
+        }
+        x -= w;
+    }
+    pool.last().map(|n| (*n).clone())
 }
 
 fn hash_name(name: &str) -> u32 {
@@ -388,6 +473,8 @@ struct State {
     active_underline: bool,
     tab_numbers: bool,
     race_all_tabs: bool,
+    diversity: bool, // option `diversity`: weigh new characters against the session's (default on)
+    rng: u64,
     sounds_dir: String,
     phrase_script: String,
     player: String,
@@ -540,6 +627,36 @@ impl State {
             self.tab_chars.insert(tab_id, character.to_string());
         }
         ok
+    }
+
+    // Cross-session history of recent picks (newest last, 16 lines), used to damp repeats.
+    fn read_recent(&self) -> Vec<String> {
+        std::fs::read_to_string(format!("{}/recent-characters", STATE_ROOT))
+            .map(|t| t.lines().filter(|l| valid_char(l)).map(String::from).collect())
+            .unwrap_or_default()
+    }
+
+    fn push_recent(&self, name: &str) {
+        let mut v = self.read_recent();
+        v.push(name.to_string());
+        let skip = v.len().saturating_sub(16);
+        let path = format!("{}/recent-characters", STATE_ROOT);
+        let tmp = format!("{}.{}", path, std::process::id());
+        let _ = std::fs::write(&tmp, v[skip..].join("\n") + "\n").and_then(|_| std::fs::rename(&tmp, &path));
+    }
+
+    // xorshift64*, seeded from the clock; [0,1)
+    fn next_rand(&mut self) -> f64 {
+        if self.rng == 0 {
+            let n = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(1, |d| d.as_nanos() as u64);
+            self.rng = n | 1;
+        }
+        let mut x = self.rng;
+        x ^= x >> 12;
+        x ^= x << 25;
+        x ^= x >> 27;
+        self.rng = x;
+        (x.wrapping_mul(0x2545F4914F6CDD1D) >> 11) as f64 / (1u64 << 53) as f64
     }
 
     fn def_of(&self, name: &str) -> Option<&CharDef> {
@@ -768,10 +885,24 @@ impl State {
             let nanos = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |d| d.subsec_nanos() as usize);
-            let pick = cands[nanos % cands.len()].clone();
+            let pick = if self.diversity {
+                let ctx: Vec<(String, usize)> = self
+                    .tabs
+                    .iter()
+                    .filter_map(|t| Some((self.tab_chars.get(&t.tab_id)?.clone(), t.position.abs_diff(pos))))
+                    .collect();
+                let recent = self.read_recent();
+                let names: Vec<String> = cands.iter().map(|c| (*c).clone()).collect();
+                let r = self.next_rand();
+                diverse_pick(&self.defs, &names, &ctx, &recent, r).unwrap_or_else(|| cands[nanos % cands.len()].clone())
+            } else {
+                cands[nanos % cands.len()].clone()
+            };
             eprintln!("claude-tabs: tab {} -> {}", id, pick);
             if !self.set_char(id, &pick, false) {
                 self.read_chars(); // already assigned elsewhere
+            } else {
+                self.push_recent(&pick);
             }
         }
     }
@@ -1395,6 +1526,7 @@ impl ZellijPlugin for State {
         self.race_dim = cfg.get("race_dim").and_then(|v| v.parse::<f32>().ok()).map_or(0.4, |v| v.clamp(0.1, 1.0));
         self.plain_dim = cfg.get("plain_dim").and_then(|v| v.parse::<f32>().ok()).map_or(PLAIN_DIM_DEFAULT, |v| v.clamp(0.1, 1.0));
         self.race_all_tabs = truthy(cfg.get("race_all_tabs"), false);
+        self.diversity = truthy(cfg.get("diversity"), true);
         self.races_opt = cfg
             .get("races")
             .map(|v| v.split(|c: char| c == ',' || c.is_whitespace()).filter(|x| valid_race(x)).map(String::from).collect::<Vec<_>>())
@@ -2024,6 +2156,99 @@ impl State {
 mod tests {
     use super::*;
     use unicode_width::UnicodeWidthStr;
+
+    // deterministic xorshift for the simulations
+    fn sim_rng(seed: u64) -> impl FnMut() -> f64 {
+        let mut x = seed | 1;
+        move || {
+            x ^= x >> 12;
+            x ^= x << 25;
+            x ^= x >> 27;
+            (x.wrapping_mul(0x2545F4914F6CDD1D) >> 11) as f64 / (1u64 << 53) as f64
+        }
+    }
+
+    // sessions of 2-8 tabs appended one by one (unique characters, Pit Lord excluded like the real pool)
+    fn simulate(diverse: bool, sessions: usize) -> (usize, usize, Vec<(String, usize)>, usize) {
+        let defs = parse_characters(CHARACTERS_TSV);
+        let all: Vec<String> = defs.iter().filter(|d| d.name != "Pit Lord").map(|d| d.name.clone()).collect();
+        let mut rnd = sim_rng(0xC0FFEE);
+        let (mut clash, mut picks, mut same_theme_adj) = (0, 0, 0);
+        let mut races: HashMap<String, usize> = HashMap::new();
+        let mut recent: Vec<String> = Vec::new();
+        for s in 0..sessions {
+            let n = 2 + s % 7;
+            let mut live: Vec<String> = Vec::new();
+            for pos in 0..n {
+                let cands: Vec<String> = all.iter().filter(|c| !live.contains(c)).cloned().collect();
+                let ctx: Vec<(String, usize)> = live.iter().enumerate().map(|(i, c)| (c.clone(), pos - i)).collect();
+                let pick = if diverse {
+                    diverse_pick(&defs, &cands, &ctx, &recent, rnd()).unwrap()
+                } else {
+                    cands[(rnd() * cands.len() as f64) as usize].clone()
+                };
+                let d = defs.iter().find(|d| d.name == pick).unwrap();
+                if let Some(prev) = live.last().and_then(|p| defs.iter().find(|x| x.name == *p)) {
+                    // an alternative without a clash existed?
+                    let alt = cands.iter().any(|c| !clashes_adjacent(defs.iter().find(|x| x.name == *c).unwrap(), prev));
+                    if clashes_adjacent(d, prev) && alt {
+                        clash += 1;
+                    }
+                    if same(&d.theme, &prev.theme) {
+                        same_theme_adj += 1;
+                    }
+                }
+                *races.entry(d.race.clone()).or_default() += 1;
+                picks += 1;
+                recent.push(pick.clone());
+                live.push(pick);
+            }
+        }
+        let mut r: Vec<(String, usize)> = races.into_iter().collect();
+        r.sort();
+        (clash, picks, r, same_theme_adj)
+    }
+
+    #[test]
+    fn diversity_metadata_is_complete() {
+        let defs = parse_characters(CHARACTERS_TSV);
+        assert!(defs.iter().all(|d| d.role == "hero" || d.role == "unit"), "every row has a role");
+        assert!(defs.iter().any(|d| d.sex == "f") && defs.iter().any(|d| d.sex == "m"));
+    }
+
+    #[test]
+    fn diversity_never_clashes_with_adjacent_tab() {
+        let (clash, picks, races, theme_adj) = simulate(true, 1000);
+        let (_, _, base_races, base_theme_adj) = simulate(false, 1000);
+        eprintln!("diverse: {} picks, {} adjacent same-race+role/theme clashes, {} adjacent same-theme", picks, clash, theme_adj);
+        eprintln!("diverse races: {:?}\nrandom  races: {:?}\nrandom adjacent same-theme: {}", races, base_races, base_theme_adj);
+        assert_eq!(clash, 0);
+        assert!(theme_adj < base_theme_adj);
+    }
+
+    #[test]
+    fn diversity_spreads_races() {
+        // share of each race among the picks must be closer to even than the 92-character pool is
+        let (_, picks, races, _) = simulate(true, 1000);
+        let (_, _, base, _) = simulate(false, 1000);
+        let spread = |r: &Vec<(String, usize)>| {
+            let mean = picks as f64 / r.len() as f64;
+            r.iter().map(|x| (x.1 as f64 - mean).abs()).sum::<f64>() / picks as f64
+        };
+        assert!(spread(&races) < spread(&base), "diverse {} vs random {}", spread(&races), spread(&base));
+    }
+
+    #[test]
+    fn diversity_penalises_same_family() {
+        let defs = parse_characters(CHARACTERS_TSV);
+        let ctx = vec![("Illidan Stormrage".to_string(), 1)];
+        let w = |n: &str| diversity_weight(&defs, n, &ctx, &[]);
+        assert!(w("Lovec démonů") < w("Thrall"));
+        assert!(w("Lovec démonů") < w("Tichondrius"));
+        assert!(w("Tichondrius") < w("Thrall"));
+        // recent picks are damped
+        assert!(diversity_weight(&defs, "Thrall", &[], &["Thrall".to_string()]) < diversity_weight(&defs, "Thrall", &[], &[]));
+    }
 
     // relative luminance of every inactive Claude tab background (race_dim 0.4), all characters
     fn claude_bgs(dim: f32) -> Vec<(String, (u8, u8, u8))> {

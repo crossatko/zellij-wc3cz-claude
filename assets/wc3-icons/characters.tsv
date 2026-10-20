@@ -1,93 +1,93 @@
-race	character	codepoint	clips	icon_file
-demon	Tichondrius	U+1FA70	8	icons/chars/BTNTichondrius.webp
-demon	Varimathras	U+1FA71	11	icons/chars/BTNVarimathras.webp
-human	Arcimág	U+1FA72	7	icons/chars/BTNHeroArchMage.webp
-human	Arthas Menethill	U+1FA73	9	icons/chars/BTNArthas.webp
-human	Gyrokoptéra	U+1FA74	12	icons/chars/BTNGyrocopter.webp
-human	Horský král	U+1FA75	8	icons/chars/BTNHeroMountainKing.webp
-human	Jaina Proudmoore	U+1FA76	8	icons/chars/BTNJaina.webp
-human	Jezdec na gryphonu	U+1FA77	7	icons/chars/BTNGryphonRider.webp
-human	Kael'thas Sunstrider	U+1FA78	7	icons/chars/BTNBloodElfPrince.webp
-human	Kněz	U+1FA79	11	icons/chars/BTNPriest.webp
-human	Krvavý mág	U+1FA7A	10	icons/chars/BTNHeroBloodElfPrince.webp
-human	Lapač kouzel	U+1FA7B	9	icons/chars/BTNSpellBreaker.webp
-human	Lord Garithos	U+1FA7C	7	icons/chars/BTNGarithos.webp
-human	Minometčíci	U+1FA80	10	icons/chars/BTNMortarTeam.webp
-human	Muradin Bronzebeard	U+1FA81	8	icons/chars/BTNMuradinBronzebeard.webp
-human	Paladin	U+1FA82	10	icons/chars/BTNHeroPaladin.webp
-human	Pilot dračího jestřába	U+1FA83	12	icons/chars/BTNDragonHawkRider.webp
-human	Rytíř	U+1FA84	8	icons/chars/BTNFootman.webp
-human	Sedlák	U+1FA85	8	icons/chars/BTNPeasant.webp
-human	Střelec	U+1FA86	10	icons/chars/BTNRifleman.webp
-human	Uther the Lightbringer	U+1FA87	7	icons/chars/BTNUther.webp
-human	Čarodějka	U+1FA88	9	icons/chars/BTNSorceress.webp
-naga	Naga myrmidon	U+1FA89	10	icons/chars/BTNNagaMyrmidon.webp
-naga	Naga royal guard	U+1FA8A	10	icons/chars/BTNNagaMyrmidonRoyalGuard.webp
-naga	Naga siren	U+1FA8E	9	icons/chars/BTNNagaSummoner.webp
-naga	Sea witch	U+1FA8F	8	icons/chars/BTNNagaSeaWitch.webp
-neutral	Akama	U+1FA90	11	icons/chars/BTNAkama.webp
-neutral	Alchemist	U+1FA91	11	icons/chars/BTNHeroAlchemist.webp
-neutral	Banditi	U+1FA92	7	icons/chars/BTNBandit.webp
-neutral	Brewmaster	U+1FA93	12	icons/chars/BTNPandarenBrewmaster.webp
-neutral	Dark Ranger	U+1FA94	8	icons/chars/BTNHeroRanger.webp
-neutral	Elfí Pracovník	U+1FA95	10	icons/chars/BTNBloodElfPeasant.webp
-neutral	Firelord	U+1FA96	8	icons/chars/BTNHeroAvatarOfFlame.webp
-neutral	Kapitán	U+1FA97	4	icons/chars/BTNTheCaptain.webp
-neutral	Ledoví trollové	U+1FA98	6	icons/chars/BTNIceTroll.webp
-neutral	Lesní trollové	U+1FA99	6	icons/chars/BTNForestTroll.webp
-neutral	Ogrové	U+1FA9A	6	icons/chars/BTNOgre.webp
-neutral	Pit Lord	U+1FA9B	0	icons/chars/BTNPitLord.webp
-neutral	Sapper	U+1FA9C	10	icons/chars/BTNGoblinSapper.webp
-neutral	Satyrové	U+1FA9D	6	icons/chars/BTNSatyr.webp
-neutral	Sylvanas Windrunner	U+1FA9E	6	icons/chars/BTNSylvanas.webp
-neutral	Tinker	U+1FA9F	12	icons/chars/BTNHeroTinker.webp
-human	Rytíř 2 (knight rider on horse)	U+1FAA0	9	icons/chars/BTNKnight.webp
-neutral	Vile Temptress	U+1FAA1	8	icons/chars/BTNVileTemptress.webp
-neutral	Vzducholoď	U+1FAA2	10	icons/chars/BTNGoblinZeppelin.webp
-nightelf	Dozorkyně	U+1FAA3	12	icons/chars/BTNHeroWarden.webp
-nightelf	Druid drápu	U+1FAA4	10	icons/chars/BTNDruidOfTheClaw.webp
-nightelf	Druid pařátu	U+1FAA5	11	icons/chars/BTNDruidOfTheTalon.webp
-nightelf	Dryáda	U+1FAA6	9	icons/chars/BTNDryad.webp
-nightelf	Illidan Stormrage	U+1FAA7	7	icons/chars/BTNIllidan.webp
-nightelf	Jezdec na hyppogryfovi	U+1FAA8	5	icons/chars/BTNHippogriffRider.webp
-nightelf	Lovec démonů	U+1FAA9	10	icons/chars/BTNHeroDemonHunter.webp
-nightelf	Lovkyně	U+1FAAA	11	icons/chars/BTNHuntress.webp
-nightelf	Lučišnice	U+1FAAB	13	icons/chars/BTNArcher.webp
-nightelf	Maiev Shadowsong	U+1FAAC	9	icons/chars/BTNWarden.webp
-nightelf	Malfurion Stormrage	U+1FAAD	7	icons/chars/BTNMalfurion.webp
-nightelf	Měsíční kněžka	U+1FAAE	10	icons/chars/BTNPriestessOfTheMoon.webp
-nightelf	Strážce lesa	U+1FAAF	7	icons/chars/BTNKeeperOfTheGrove.webp
-nightelf	Tyrande Whisperwind	U+1FAB0	7	icons/chars/BTNTyrande.webp
-orc	Cairne Bloodhoof	U+1FAB1	8	icons/chars/BTNCairneBloodhoof.webp
-orc	Grommash Hellscream	U+1FAB2	4	icons/chars/BTNHellScream.webp
-orc	Jezdec	U+1FAB3	7	icons/chars/BTNRaider.webp
-orc	Jezdec na wyverně	U+1FAB4	9	icons/chars/BTNWyvernRider.webp
-orc	Náčelník taurů	U+1FAB5	8	icons/chars/BTNHeroTaurenChieftain.webp
-orc	Peon	U+1FAB6	7	icons/chars/BTNPeon.webp
-orc	Prorok	U+1FAB7	9	icons/chars/BTNHeroFarseer.webp
-orc	Pán mečů	U+1FAB8	7	icons/chars/BTNHeroBlademaster.webp
-orc	Přízračný chodec	U+1FAB9	10	icons/chars/BTNSpiritWalker.webp
-orc	Rexxar	U+1FABA	12	icons/chars/BTNRexxar.webp
-orc	Rokhan	U+1FABB	9	icons/chars/BTNRokhan.webp
-orc	Stínový lovec	U+1FABC	14	icons/chars/BTNShadowHunter.webp
-orc	Taur	U+1FABD	8	icons/chars/BTNTauren.webp
-orc	Thrall	U+1FABE	7	icons/chars/BTNThrall.webp
-orc	Trollí Netopýrník	U+1FABF	9	icons/chars/BTNTrollBatRider.webp
-orc	Trollí lovec lebek	U+1FAC0	7	icons/chars/BTNHeadhunter.webp
-orc	Trollí čarodějnice - lékařka	U+1FAC1	12	icons/chars/BTNWitchDoctor.webp
-orc	Šaman	U+1FAC2	8	icons/chars/BTNShaman.webp
-orc	Žump	U+1FAC3	9	icons/chars/BTNGrunt.webp
-undead	Akolyta	U+1FAC4	12	icons/chars/BTNAcolyte.webp
-undead	Arthas (Nemrtví)	U+1FAC5	7	icons/chars/BTNArthasEvil.webp
-undead	Ghůl	U+1FAC6	5	icons/chars/BTNGhoul.webp
-undead	Hnus	U+1FAC8	5	icons/chars/BTNAbomination.webp
-undead	Kel'Thuzad	U+1FACD	7	icons/chars/BTNKelThuzad.webp
-undead	Lich	U+1FACE	10	icons/chars/BTNHeroLich.webp
-undead	Pán děsu	U+1FACF	11	icons/chars/BTNHeroDreadLord.webp
-undead	Pán podzemí	U+1FAD0	10	icons/chars/BTNHeroCryptLord.webp
-undead	Rytíř smrti	U+1FAD1	10	icons/chars/BTNHeroDeathKnight.webp
-undead	Smrtonožka	U+1FAD2	9	icons/chars/BTNCryptFiend.webp
-undead	Stín	U+1FAD3	10	icons/chars/BTNShade.webp
-undead	Sylvanas Windrunner (Nemrtví)	U+1FAD4	6	icons/chars/BTNSylvanasGhost.webp
-undead	Černokněžník	U+1FAD5	9	icons/chars/BTNNecromancer.webp
-undead	Ďábel pekelný	U+1FAD6	9	icons/chars/BTNInfernal.webp
+race	character	codepoint	clips	icon_file	role	sex	theme
+demon	Tichondrius	U+1FA70	8	icons/chars/BTNTichondrius.webp	hero	m	demon
+demon	Varimathras	U+1FA71	11	icons/chars/BTNVarimathras.webp	hero	m	demon
+human	Arcimág	U+1FA72	7	icons/chars/BTNHeroArchMage.webp	hero	m	arcane
+human	Arthas Menethill	U+1FA73	9	icons/chars/BTNArthas.webp	hero	m	knight
+human	Gyrokoptéra	U+1FA74	12	icons/chars/BTNGyrocopter.webp	unit	-	machine
+human	Horský král	U+1FA75	8	icons/chars/BTNHeroMountainKing.webp	hero	m	knight
+human	Jaina Proudmoore	U+1FA76	8	icons/chars/BTNJaina.webp	hero	f	arcane
+human	Jezdec na gryphonu	U+1FA77	7	icons/chars/BTNGryphonRider.webp	unit	-	rider
+human	Kael'thas Sunstrider	U+1FA78	7	icons/chars/BTNBloodElfPrince.webp	hero	m	arcane
+human	Kněz	U+1FA79	11	icons/chars/BTNPriest.webp	unit	-	arcane
+human	Krvavý mág	U+1FA7A	10	icons/chars/BTNHeroBloodElfPrince.webp	hero	m	arcane
+human	Lapač kouzel	U+1FA7B	9	icons/chars/BTNSpellBreaker.webp	unit	-	arcane
+human	Lord Garithos	U+1FA7C	7	icons/chars/BTNGarithos.webp	hero	m	knight
+human	Minometčíci	U+1FA80	10	icons/chars/BTNMortarTeam.webp	unit	-	machine
+human	Muradin Bronzebeard	U+1FA81	8	icons/chars/BTNMuradinBronzebeard.webp	hero	m	knight
+human	Paladin	U+1FA82	10	icons/chars/BTNHeroPaladin.webp	hero	m	knight
+human	Pilot dračího jestřába	U+1FA83	12	icons/chars/BTNDragonHawkRider.webp	unit	-	rider
+human	Rytíř	U+1FA84	8	icons/chars/BTNFootman.webp	unit	-	knight
+human	Sedlák	U+1FA85	8	icons/chars/BTNPeasant.webp	unit	-	-
+human	Střelec	U+1FA86	10	icons/chars/BTNRifleman.webp	unit	-	-
+human	Uther the Lightbringer	U+1FA87	7	icons/chars/BTNUther.webp	hero	m	knight
+human	Čarodějka	U+1FA88	9	icons/chars/BTNSorceress.webp	unit	f	arcane
+naga	Naga myrmidon	U+1FA89	10	icons/chars/BTNNagaMyrmidon.webp	unit	-	naga
+naga	Naga royal guard	U+1FA8A	10	icons/chars/BTNNagaMyrmidonRoyalGuard.webp	unit	-	naga
+naga	Naga siren	U+1FA8E	9	icons/chars/BTNNagaSummoner.webp	unit	f	naga
+naga	Sea witch	U+1FA8F	8	icons/chars/BTNNagaSeaWitch.webp	unit	f	naga
+neutral	Akama	U+1FA90	11	icons/chars/BTNAkama.webp	hero	m	nature
+neutral	Alchemist	U+1FA91	11	icons/chars/BTNHeroAlchemist.webp	hero	-	goblin
+neutral	Banditi	U+1FA92	7	icons/chars/BTNBandit.webp	unit	-	-
+neutral	Brewmaster	U+1FA93	12	icons/chars/BTNPandarenBrewmaster.webp	hero	m	-
+neutral	Dark Ranger	U+1FA94	8	icons/chars/BTNHeroRanger.webp	hero	f	undead
+neutral	Elfí Pracovník	U+1FA95	10	icons/chars/BTNBloodElfPeasant.webp	unit	-	-
+neutral	Firelord	U+1FA96	8	icons/chars/BTNHeroAvatarOfFlame.webp	hero	-	demon
+neutral	Kapitán	U+1FA97	4	icons/chars/BTNTheCaptain.webp	unit	-	-
+neutral	Ledoví trollové	U+1FA98	6	icons/chars/BTNIceTroll.webp	unit	-	troll
+neutral	Lesní trollové	U+1FA99	6	icons/chars/BTNForestTroll.webp	unit	-	troll
+neutral	Ogrové	U+1FA9A	6	icons/chars/BTNOgre.webp	unit	-	-
+neutral	Pit Lord	U+1FA9B	0	icons/chars/BTNPitLord.webp	hero	-	demon
+neutral	Sapper	U+1FA9C	10	icons/chars/BTNGoblinSapper.webp	unit	-	goblin
+neutral	Satyrové	U+1FA9D	6	icons/chars/BTNSatyr.webp	unit	-	demon
+neutral	Sylvanas Windrunner	U+1FA9E	6	icons/chars/BTNSylvanas.webp	hero	f	undead
+neutral	Tinker	U+1FA9F	12	icons/chars/BTNHeroTinker.webp	hero	-	goblin
+human	Rytíř 2 (knight rider on horse)	U+1FAA0	9	icons/chars/BTNKnight.webp	unit	-	rider
+neutral	Vile Temptress	U+1FAA1	8	icons/chars/BTNVileTemptress.webp	unit	f	demon
+neutral	Vzducholoď	U+1FAA2	10	icons/chars/BTNGoblinZeppelin.webp	unit	-	goblin
+nightelf	Dozorkyně	U+1FAA3	12	icons/chars/BTNHeroWarden.webp	hero	f	nightelf
+nightelf	Druid drápu	U+1FAA4	10	icons/chars/BTNDruidOfTheClaw.webp	unit	m	nature
+nightelf	Druid pařátu	U+1FAA5	11	icons/chars/BTNDruidOfTheTalon.webp	unit	m	nature
+nightelf	Dryáda	U+1FAA6	9	icons/chars/BTNDryad.webp	unit	f	nature
+nightelf	Illidan Stormrage	U+1FAA7	7	icons/chars/BTNIllidan.webp	hero	m	demon
+nightelf	Jezdec na hyppogryfovi	U+1FAA8	5	icons/chars/BTNHippogriffRider.webp	unit	-	rider
+nightelf	Lovec démonů	U+1FAA9	10	icons/chars/BTNHeroDemonHunter.webp	hero	m	demon
+nightelf	Lovkyně	U+1FAAA	11	icons/chars/BTNHuntress.webp	unit	f	nightelf
+nightelf	Lučišnice	U+1FAAB	13	icons/chars/BTNArcher.webp	unit	f	nightelf
+nightelf	Maiev Shadowsong	U+1FAAC	9	icons/chars/BTNWarden.webp	hero	f	nightelf
+nightelf	Malfurion Stormrage	U+1FAAD	7	icons/chars/BTNMalfurion.webp	hero	m	nature
+nightelf	Měsíční kněžka	U+1FAAE	10	icons/chars/BTNPriestessOfTheMoon.webp	unit	f	nightelf
+nightelf	Strážce lesa	U+1FAAF	7	icons/chars/BTNKeeperOfTheGrove.webp	hero	m	nature
+nightelf	Tyrande Whisperwind	U+1FAB0	7	icons/chars/BTNTyrande.webp	hero	f	nightelf
+orc	Cairne Bloodhoof	U+1FAB1	8	icons/chars/BTNCairneBloodhoof.webp	hero	m	orcish
+orc	Grommash Hellscream	U+1FAB2	4	icons/chars/BTNHellScream.webp	hero	m	orcish
+orc	Jezdec	U+1FAB3	7	icons/chars/BTNRaider.webp	unit	-	rider
+orc	Jezdec na wyverně	U+1FAB4	9	icons/chars/BTNWyvernRider.webp	unit	-	rider
+orc	Náčelník taurů	U+1FAB5	8	icons/chars/BTNHeroTaurenChieftain.webp	hero	m	orcish
+orc	Peon	U+1FAB6	7	icons/chars/BTNPeon.webp	unit	-	-
+orc	Prorok	U+1FAB7	9	icons/chars/BTNHeroFarseer.webp	hero	m	shaman
+orc	Pán mečů	U+1FAB8	7	icons/chars/BTNHeroBlademaster.webp	hero	m	orcish
+orc	Přízračný chodec	U+1FAB9	10	icons/chars/BTNSpiritWalker.webp	unit	-	shaman
+orc	Rexxar	U+1FABA	12	icons/chars/BTNRexxar.webp	hero	m	orcish
+orc	Rokhan	U+1FABB	9	icons/chars/BTNRokhan.webp	hero	m	troll
+orc	Stínový lovec	U+1FABC	14	icons/chars/BTNShadowHunter.webp	hero	m	troll
+orc	Taur	U+1FABD	8	icons/chars/BTNTauren.webp	unit	-	orcish
+orc	Thrall	U+1FABE	7	icons/chars/BTNThrall.webp	hero	m	shaman
+orc	Trollí Netopýrník	U+1FABF	9	icons/chars/BTNTrollBatRider.webp	unit	-	troll
+orc	Trollí lovec lebek	U+1FAC0	7	icons/chars/BTNHeadhunter.webp	unit	-	troll
+orc	Trollí čarodějnice - lékařka	U+1FAC1	12	icons/chars/BTNWitchDoctor.webp	unit	f	troll
+orc	Šaman	U+1FAC2	8	icons/chars/BTNShaman.webp	unit	-	shaman
+orc	Žump	U+1FAC3	9	icons/chars/BTNGrunt.webp	unit	-	-
+undead	Akolyta	U+1FAC4	12	icons/chars/BTNAcolyte.webp	unit	-	undead
+undead	Arthas (Nemrtví)	U+1FAC5	7	icons/chars/BTNArthasEvil.webp	hero	m	undead
+undead	Ghůl	U+1FAC6	5	icons/chars/BTNGhoul.webp	unit	-	undead
+undead	Hnus	U+1FAC8	5	icons/chars/BTNAbomination.webp	unit	-	undead
+undead	Kel'Thuzad	U+1FACD	7	icons/chars/BTNKelThuzad.webp	hero	m	undead
+undead	Lich	U+1FACE	10	icons/chars/BTNHeroLich.webp	hero	m	undead
+undead	Pán děsu	U+1FACF	11	icons/chars/BTNHeroDreadLord.webp	hero	m	demon
+undead	Pán podzemí	U+1FAD0	10	icons/chars/BTNHeroCryptLord.webp	hero	m	undead
+undead	Rytíř smrti	U+1FAD1	10	icons/chars/BTNHeroDeathKnight.webp	hero	m	undead
+undead	Smrtonožka	U+1FAD2	9	icons/chars/BTNCryptFiend.webp	unit	-	undead
+undead	Stín	U+1FAD3	10	icons/chars/BTNShade.webp	unit	-	undead
+undead	Sylvanas Windrunner (Nemrtví)	U+1FAD4	6	icons/chars/BTNSylvanasGhost.webp	hero	f	undead
+undead	Černokněžník	U+1FAD5	9	icons/chars/BTNNecromancer.webp	unit	m	undead
+undead	Ďábel pekelný	U+1FAD6	9	icons/chars/BTNInfernal.webp	unit	-	demon
