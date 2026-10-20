@@ -422,11 +422,8 @@ written blind.
 - A plugin-less config that still has old hooks in Claude settings doubles every hook once the plugin is
   installed: run `setup.sh --migrate-to-plugin`. A script that used to rely on `setup.sh` doing things by
   default now needs the explicit options.
-- NEXT: the fresh-install test on a clean second machine: follow `FRESH_INSTALL_TEST.md` (preconditions,
-  procedure, what to produce, rules). Append the results to this file and fix the README for every
-  deviation found.
-- Open: the Known issues above; test on a Mac and other desktops/terminals; the marketplace install from
-  GitHub (the repo is public) has never been run end to end; Bluetooth wake-up clipping of the first ms
+- Fresh-install test done on a second machine (results below). NEXT: macOS and other terminals.
+- Open: the Known issues above; test on a Mac and other desktops/terminals; Bluetooth wake-up clipping of the first ms
   of a voice line is an untested hypothesis (try `lead_in_ms`).
 - Tests: `sh tests/subagents.sh` (hook/agents scripts, private TMPDIR, stub zellij), `cargo test` (wasm).
 - Resume: `sh setup.sh` (status), `./dev.sh -s <isolated session>` (build + reload), `claude plugin
@@ -437,3 +434,38 @@ written blind.
   Found the installed marketplace clone and cache copy carrying a newer `claude-agents.sh` than git HEAD
   (record-skipping, last-16-lines version); committed after a check on 47 real transcripts (same result as the old version, robust to records appended after the final message).
   Screenshot test in an isolated kitty+zellij session passed (portraits, tint, clock, no prompt).
+
+## Fresh-install test, 2026-10-20
+
+Machine: Linux/Hyprland, PipeWire, kitty 0.49.2, zellij 0.45.1, Claude Code 2.1.302 then 2.1.304, a second
+Claude config dir (`CLAUDE_CONFIG_DIR`).
+- Run: `claude plugin marketplace add crossatko/zellij-wc3cz-claude` (about 50 s, clone ~270 MB, half `.git`),
+  `claude plugin install zellij-wc3cz@zellij-wc3cz` (cache ~140 MB more). Works as written. The clone went
+  over HTTPS on the first run and SSH on the second (follows the user's git config; SSH needs a key).
+- Deviations, README fixed: (1) with `CLAUDE_CONFIG_DIR` the plugin lives under that dir, so commands and
+  `layouts/claude.kdl` now show `${CLAUDE_CONFIG_DIR:-~/.claude}`; each config dir needs its own marketplace
+  add/install, one layout serves all (hooks report `pkgdir`). (2) The `claude` CLI itself adds
+  `extraKnownMarketplaces`/`enabledPlugins` to settings.json (the package's scripts never do): reworded.
+  (3) `fontconfig/install.sh` also creates `conf.d/`: stated. (4) Icons need a full terminal restart, and
+  the font flag `<state root>/font` (auto mode, cached 10 min) stayed 0 if a hook ran before the font
+  existed: `install.sh` now removes that one file after installing (README says how to do it by hand).
+  (5) kitty 0.49.2 picks Noto Color Emoji for U+1FA70..U+1FAD6 despite `fc-match` ranking WC3 Icons first
+  (tab showed Noto's mirror ball): `symbol_map U+1FA70-U+1FAD6 WC3 Icons` in kitty.conf is REQUIRED
+  (verified in isolated kitty windows with plain printed codepoints and live by the owner). The older
+  statement that it is not needed was wrong. (6) With `keybinds clear-defaults=true` there is no
+  Alt+hjkl/Alt+Down, the 1-row bar could not be focused to answer the prompt, and the prompt text looked cut
+  off on the left in a ~1250 px window (cause not investigated): `setup.sh --permissions` (verified; writes
+  `permissions.kdl` atomically) is the recommended path then. (7) A plain `zellij` with
+  `default_layout "compact"` never loads the plugin; start `zellij -n claude` or set `default_layout`.
+- Claude Code 2.1.30x behaviours found during the run, all handled and pushed (details in "How it works"):
+  transcript trailing records (1e38cb2), TaskStop-killed agents leaving a `.sub` marker (7ea1022), helper
+  SubagentStop with no marker (ee4a0d0), SubagentHandback transcripts (e1027a5), stale session snapshot
+  overwriting TabUpdate (highlight jumped back, per-tab agent count differed; 337d606).
+- Verified: marketplace add + install from the real GitHub repo; hooks fire in a new session; layout, bar,
+  spinner, colour icons in kitty (after the symbol_map); finish detection after the fixes (owner: "looks
+  like it works").
+- UNVERIFIED: macOS; other terminals (alacritty, wezterm, foot, ghostty); the interactive `/plugin` UI; the
+  `n` (deny) permission flow; Bluetooth lead-in clipping (`lead_in_ms`); a 10 s gap before the flash after a
+  finish (unexplained); the two-tab real-payload permission/AskUserQuestion attention flow on this machine;
+  edge checks (narrow terminal, HOME with spaces, `setup.sh` with no flags, `dev.sh` refusing foreign
+  sessions); uninstall (deliberately skipped, the owner keeps the install).

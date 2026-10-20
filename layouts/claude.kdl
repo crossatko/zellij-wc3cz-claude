@@ -5,10 +5,11 @@
 // location = where claude-tabs.wasm is on disk (zellij needs an absolute or ~ path; a relative path is
 // resolved against the session's cwd, not this file):
 //   - installed as a Claude Code plugin from GitHub: the marketplace clone below
-//     (with CLAUDE_CONFIG_DIR set: $CLAUDE_CONFIG_DIR/plugins/marketplaces/zellij-wc3cz/claude-tabs.wasm)
+//     (the plugin lives under ${CLAUDE_CONFIG_DIR:-~/.claude}: with CLAUDE_CONFIG_DIR set, write that dir's real
+//     path below instead of ~/.claude; KDL does not expand variables)
 //   - a git checkout: file:/path/to/zellij-wc3cz-claude/claude-tabs.wasm
 // zellij asks once for the plugin's permissions in the bar: click the bar (or Alt+Down) and press y;
-// the grant is remembered for this exact path.
+// the grant is remembered for this exact path (or pre-grant: sh <pkg>/setup.sh --permissions).
 // Plugin options (README "Options") go into the plugin block, e.g. ding_when_focused false.
 layout {
     pane

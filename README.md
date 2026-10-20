@@ -55,7 +55,10 @@ All scripts find each other relative to their own location, so the checkout can 
 
 ## Quick start (no config edits)
 
-Nothing in your existing config files has to change. Two steps:
+None of the package's own scripts edits your zellij, terminal or Claude config files (the `claude` CLI
+itself adds `extraKnownMarketplaces` and `enabledPlugins` to the config dir's `settings.json` when you run
+the two commands below). Two steps. In the paths below, `${CLAUDE_CONFIG_DIR:-~/.claude}` is your Claude
+config dir; zellij does not expand variables in a layout, so write the real path there:
 
 1. **Claude Code plugin** (registers the hooks; in a shell, or the same as `/plugin ...` inside `claude`):
 
@@ -64,14 +67,19 @@ Nothing in your existing config files has to change. Two steps:
    claude plugin install zellij-wc3cz@zellij-wc3cz
    ```
 
-   Restart running `claude` sessions (or `/reload-plugins`). With several Claude config dirs, run it once
-   per dir (`CLAUDE_CONFIG_DIR=~/.claude-work claude plugin ...`).
+   Restart running `claude` sessions (or `/reload-plugins`). The marketplace add takes about 50 s and clones
+   the repo (about 270 MB, half of it `.git`); the install adds a cached copy (about 140 MB). The clone
+   uses your git config's transport (HTTPS, or SSH if you rewrite GitHub URLs to SSH, which needs a key).
+   With several Claude config dirs, run both commands once per dir (`CLAUDE_CONFIG_DIR=~/.claude-work
+   claude plugin ...`): with `CLAUDE_CONFIG_DIR` set the plugin lives under that dir, not `~/.claude`. One
+   zellij layout (pointing at one copy of the wasm) serves all of them: each config's hooks come from its
+   own copy and tell the plugin the package dir (the `pkgdir` state file).
 
 2. **zellij layout** with the bar (the one step that cannot be automated: zellij only loads plugins named
    in a layout or config). Start a session with the shipped layout, straight from the plugin's copy:
 
    ```sh
-   zellij -n ~/.claude/plugins/marketplaces/zellij-wc3cz/layouts/claude.kdl
+   zellij -n ${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/marketplaces/zellij-wc3cz/layouts/claude.kdl
    ```
 
    or put this pane into your own layout instead of `compact-bar`:
@@ -82,17 +90,22 @@ Nothing in your existing config files has to change. Two steps:
    }
    ```
 
-   (With `CLAUDE_CONFIG_DIR` set, the path starts with that dir instead of `~/.claude`.) To make it your
-   default, copy the layout to `~/.config/zellij/layouts/claude.kdl` and start with `zellij -n claude`, or
-   set `default_layout "claude"` if you want to.
+   (In the KDL pane write the real path, e.g. `$CLAUDE_CONFIG_DIR/plugins/...` expanded.) The bar only
+   exists in a session started with this layout: a plain `zellij` with `default_layout "compact"` never
+   loads the plugin. To make it your default, copy the layout to `~/.config/zellij/layouts/claude.kdl` and
+   start with `zellij -n claude`, or set `default_layout "claude"` in `config.kdl`.
 
    **One-time permission prompt**: the first time, zellij asks in the bar whether the plugin may read
    and change the session state, run commands (the sound player, helper scripts) and receive pipes
    (`Allow? (y/n)`): focus the bar with a mouse click on it or `Alt+↓` (zellij's default move-focus key)
-   and press `y`. The bar then shows the tabs and can no longer be focused; focus returns to your pane.
+   and press `y`. (With `keybinds clear-defaults=true` there may be no `Alt+↓`, and the 1-row bar can be
+   hard to click; the prompt text can also appear cut off on the left in a narrow window. Then use the
+   pre-grant below.) The bar then shows the tabs and can no longer be focused; focus returns to your pane.
    zellij remembers the answer for exactly this wasm path (`permissions.kdl` in zellij's cache dir).
-   Pressing `n` leaves the bar showing "permissions denied"; a new session asks again. To skip the
-   prompt, pre-grant instead: `sh ~/.claude/plugins/marketplaces/zellij-wc3cz/setup.sh --permissions`.
+   Pressing `n` leaves the bar showing "permissions denied"; a new session asks again. If you
+   cannot answer the prompt (or just want to skip it), pre-grant before starting the session:
+   `sh ${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/marketplaces/zellij-wc3cz/setup.sh --permissions` (writes
+   zellij's `permissions.kdl` atomically for the wasm path of that copy).
 
 The marketplace clone is only refreshed by `claude plugin marketplace update zellij-wc3cz`: until then the
 wasm the layout loads can lag behind the hooks of a newer plugin version.
@@ -105,23 +118,26 @@ of the layout (see Options), e.g. `plugin location="file:..." { ding_when_focuse
 each character gets its portrait:
 
 ```sh
-sh ~/.claude/plugins/marketplaces/zellij-wc3cz/fontconfig/install.sh            # --uninstall to undo
+sh ${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/marketplaces/zellij-wc3cz/fontconfig/install.sh   # --uninstall to undo
 ```
 
 It writes two files that belong to this package (`~/.local/share/fonts/wc3-icons.ttf` and
-`~/.config/fontconfig/conf.d/60-wc3-icons.conf`) and runs `fc-cache`; it edits no terminal config.
+`~/.config/fontconfig/conf.d/60-wc3-icons.conf`, creating `~/.config/fontconfig/conf.d/` if missing),
+runs `fc-cache` and drops the plugin's cached font flag; it edits no terminal config. Then close ALL
+windows of your terminal and start it again (a running kitty keeps its font set). If you installed the
+font after a hook already ran, the flag (`/tmp/zellij-$(id -u)/zellij-claude/font`, re-checked every 10
+min) may still say 0 and the bar shows initials badges: delete that file and the next hook event re-checks.
 The rules make fontconfig use "WC3 Icons" for the font's character icon codepoints (U+1FA70..U+1FAD6 minus
 gaps, one per character), ahead of other emoji fonts; every other emoji and all text are unchanged. The
 seven race fallback codepoints U+1F7E0..U+1F7E6 (the orange to brown circle emoji) are NOT overridden, so
 the usual status-dot emoji keep their look; a character without an icon in the font then shows the system
 circle emoji where the race glyph would be. Side effect: in every app that uses fontconfig the few emoji
 at the character codepoints (ballet shoes, ringed planet, chair, hamsa, ...) show WC3 portraits.
-Verified only through `fc-match` and kitty's own fontconfig query (not in a running terminal window of
-every kind). Per terminal:
+Verified in kitty 0.49.2 on Linux (see the table); other terminals are untested. Per terminal:
 
 | Terminal | Colour icons after `fontconfig/install.sh` |
 |----------|--------------------------------------------|
-| kitty | expected to work through its per-character fontconfig fallback (restart kitty); the kitty fontconfig query was checked with `fc-match`; a `symbol_map ... WC3 Icons` line is not needed but harmless |
+| kitty | the fontconfig rule alone is NOT enough on 0.49.2: kitty picks Noto Color Emoji for U+1FA70..U+1FAD6 (a Noto mirror ball instead of the Demon Hunter icon) although `fc-match` ranks WC3 Icons first. Add `symbol_map U+1FA70-U+1FAD6 WC3 Icons` to `kitty.conf` and restart kitty (all windows). Verified |
 | alacritty | needs an extra fontconfig family rule of your own (append `WC3 Icons` to your terminal font's family; `fontconfig/install.sh` prints an example) and probably `font.offset.y`, see `assets/wc3-icons/README.md`; not tested here |
 | wezterm, foot, konsole | untested |
 | ghostty | no: it ignores fontconfig for emoji; add `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons` to its config yourself |
@@ -139,7 +155,7 @@ macOS: the same two steps. Sounds play through `afplay` (FLAC needs macOS 10.13+
 2. Hooks: `claude plugin uninstall zellij-wc3cz@zellij-wc3cz`, then `claude plugin marketplace remove
    zellij-wc3cz` (run both once per Claude config dir you installed it in). Hooks that an older `setup.sh`
    wrote into `settings.json`: `sh <pkg>/setup.sh --migrate-to-plugin` (before deleting the checkout).
-3. Icon font: `sh <pkg>/fontconfig/install.sh --uninstall` (or `setup.sh --font-uninstall`) removes
+3. Icon font (and the `symbol_map` line you added to `kitty.conf`, if any): `sh <pkg>/fontconfig/install.sh --uninstall` (or `setup.sh --font-uninstall`) removes
    `~/.local/share/fonts/wc3-icons.ttf` and `~/.config/fontconfig/conf.d/60-wc3-icons.conf`. While the font
    is installed it also answers for the emoji at the character codepoints in every fontconfig app.
 4. zellij permission grant (only if you answered `y` or ran `setup.sh --permissions`): delete the block whose
@@ -352,8 +368,9 @@ rust-wasm`. `target/` is git-ignored.
   to `debug.log` there. Plugin errors: `grep claude-tabs /tmp/zellij-$(id -u)/zellij-log/zellij.log`.
 - **Icons missing / boxes / wrong emoji**: `sh <pkg>/fontconfig/install.sh --check` shows what fontconfig
   picks (`WC3 Icons` expected for `charset=1fa70`); install with `fontconfig/install.sh`, then restart the
-  terminal (kitty: ctrl+shift+f5). ghostty needs its `font-codepoint-map` line (Quick start table). An old
-  kitty `symbol_map` must cover U+1FA70-U+1FAD6 (a stale U+F0100 range gives grey blobs) or be removed.
+  terminal (close all its windows; kitty also needs the `symbol_map` line from the table). ghostty needs its `font-codepoint-map` line (Quick start table). A kitty
+  `symbol_map` must cover U+1FA70-U+1FAD6 (a stale U+F0100 range gives grey blobs). Still initials badges
+  after installing the font: the font flag is cached, `rm /tmp/zellij-$(id -u)/zellij-claude/font`.
   Terminals that cannot draw it: `race_font "false"` (initials badges). The font is tuned for reference
   cells of 14x36 px (kitty font size 18, 110% line height; `assets/wc3-icons/README.md` to retune).
 - **New option has no effect**: options are fixed at session start; start a new session.
@@ -361,7 +378,7 @@ rust-wasm`. `target/` is git-ignored.
   the code, a new session picks up everything.
 - **Permission prompt every time / cannot answer it**: zellij keys the grant by the exact (`~`-expanded)
   wasm path in the layout, so a moved checkout or another path asks again. The prompt is answered in the
-  bar: click it (or `Alt+↓`), then `y`. `<pkg>/setup.sh --permissions` pre-grants this package's path (run
+  bar: click it (or `Alt+↓`, which may not exist with `clear-defaults=true`), then `y`. `<pkg>/setup.sh --permissions` pre-grants this package's path (run
   the `setup.sh` of the copy the layout points at).
 - **Bar says "permissions denied"**: the prompt was answered with `n`. Start a new session and answer `y`,
   or pre-grant with `<pkg>/setup.sh --permissions`.
