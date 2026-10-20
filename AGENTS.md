@@ -127,7 +127,8 @@ written blind.
   `$TMPDIR`, `/tmp` or `getconf DARWIN_USER_TEMP_DIR`, the first containing `zellij-<uid>/zellij-log`.
   Files under `zellij-claude/<session>/`: `<pane>` (`idle|working|done <ns> [sub] [away] [quiet]`),
   `<pane>.sub/<agent_id>` markers, `<pane>.ev` (activity), `<pane>.sess` (agent transcript dir),
-  `<pane>.attn` / `<pane>.attn-seen` (attention, below), `characters/<tab_id>`, `names/<tab_id>`,
+  `<pane>.attn` / `<pane>.attn-seen` (attention, below), `<pane>.agents` (shared agent scan, below),
+  `characters/<tab_id>`, `names/<tab_id>`,
   `last-<character>` (last clip, name sanitised); at the root also `pkgdir`, `font`, `play.lock`, `playing`,
   `queued`, `ding.log`.
 - Hooks are a silent no-op outside zellij. Poke = backgrounded `zellij pipe --name claude_poke` (logs a
@@ -139,6 +140,13 @@ written blind.
   acknowledges Done -> Idle, assigns characters and deletes state of closed panes. Only the focused instance
   runs the fast timer (spinner, blink). `get_focused_pane_info()` returns the tab ID while the manifest is
   keyed by POSITION; mapped through `TabInfo`.
+- `get_session_list()` snapshots lag behind Tab/PaneUpdate: the server refreshes session info on a ~1 s tick
+  (`~/.cache/zellij/.../session_info/<s>/session-metadata.kdl` mtimes all share one sub-second phase).
+  `fetch_snapshot` used to overwrite `tabs`/`manifest` unconditionally, and the leader fetches from
+  `refresh()` inside the TabUpdate handler itself (every 2 s), so right after a tab switch the bar of the
+  tab switched TO highlighted the tab switched FROM again (user report). Now an event's tabs/panes win for
+  `EVENT_HOLD_MS` (3 s); `plugin_ids`/session always come from the snapshot. Root cause from code + timing,
+  NOT reproduced live (unit test only for the hold rule).
 - Permission prompt: zellij 0.45.1 draws it in the 1-row bar ("... Allow? (y/n)") and HOLDS BACK every event
   (Timer included) until answered. The pane stays selectable until PermissionRequestResult (Granted or
   Denied) or the first Tab/Pane/ModeUpdate/RunCommandResult, then `set_selectable(false)` once; zellij
@@ -152,9 +160,17 @@ written blind.
   modified < 10 min whose last MESSAGE record is not an assistant end_turn/stop_sequence/refusal and not a user
   `[Request interrupted by user...]`; newest 40 of last 30 min). Real data:
   a hand-back arrives as SubagentStop only, the main thread then runs turns without UserPromptSubmit (hence
-  the `tool` hook), SubagentStart is unreliable. The agent scan is per instance; entries carry a timestamp
-  (`task_at`) and are ignored after 10 s, the leader polls (`ask_agents`) from its tick (else a stale list in
-  an inactive leader kept finished tabs Working and delayed the ding until focus).
+  the `tool` hook), SubagentStart is unreliable. The focused instance and the leader poll (`ask_agents`, 3 s);
+  results carry a timestamp (`task_at`) and are ignored after `AGENTS_FRESH_S` (10 s) (else a stale list in an
+  inactive leader kept finished tabs Working). Each poll result is also written to `<pane>.agents` (atomic)
+  and every instance unions a fresh one: before, a just-focused non-leader dropped its own stale list, so a
+  scan-only agent showed "spinner + count" in another tab's bar but not in its own for 1-3 s.
+- `SubagentHandback` (Claude Code 2.1.301+, seen in real transcripts of the second config dir): an agent can
+  end with an assistant `tool_use` SubagentHandback + the user `tool_result`, no end_turn. claude-agents.sh
+  read that as running for 10 min (mtime window): Working + "1" on the tab and the Stop deferred as `sub`
+  (7 of 8 such transcripts). Now the tool_result after a handback call counts as finished; a later user line
+  (resume) is running again. Verified: tests/subagents.sh and all 235 real transcripts older than 15 min read
+  finished.
 - Killed agents (Claude Code 2.1.30x, real session): `TaskStop` (or a kill by the user) ends the agent's
   transcript with a user record `[Request interrupted by user]` and sends NO SubagentStop, so its marker
   stayed and the tab showed Working / "1 agent running" and deferred the ding until `subagent_stale_s`

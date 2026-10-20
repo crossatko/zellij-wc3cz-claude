@@ -184,7 +184,7 @@ case "$1" in
            fi
            rm -f "$f.attn-seen"
            if [ -n "$running" ] || [ -n "$(find "$sub" -type f -mmin -"$stale_min" 2>/dev/null | head -n 1)" ]; then write done " sub$away"; else write done "$away"; fi ;;
-  end)     rm -f "$f" "$f.ev" "$f.sess" "$f.attn" "$f.attn-seen"; rm -rf "$sub" "$f".once.* ;;
+  end)     rm -f "$f" "$f.ev" "$f.sess" "$f.agents" "$f.attn" "$f.attn-seen"; rm -rf "$sub" "$f".once.* ;;
   substart|substop)
     [ -n "$2" ] || set -- "$1" "$(cat)"
     id=$(printf '%s' "$2" | sed -n 's/.*"agent_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1 | tr -c 'A-Za-z0-9_\n-' '_')

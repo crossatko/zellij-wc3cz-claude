@@ -57,6 +57,12 @@ const DEFAULT_PACKAGE_DIR: &str = "~/.config/zellij/plugins/claude-tabs";
 // seconds a published library file stays fresh / a follower waits for the leader's file before scanning itself
 const LIBRARY_STALE_S: u64 = 100;
 const LIBRARY_GRACE_S: u64 = 15;
+// a get_session_list() snapshot lags behind Tab/PaneUpdate (the server refreshes it on a ~1 s tick), so for
+// this long after such an event the event's tabs / panes win over a snapshot (else the bar of the tab just
+// switched to showed the previous tab as active again)
+const EVENT_HOLD_MS: u64 = 3000;
+// an agent scan (claude-agents.sh) result shared through <pane>.agents counts for this long
+const AGENTS_FRESH_S: u64 = 10;
 
 // Package dir: the `package_dir` option wins; else keep the current dir while a scan confirmed it (the
 // hook's global pkgdir file flips between package copies on every event, each flip would force a rescan);
@@ -389,6 +395,8 @@ struct State {
     tz_asked: u64,
     my_id: u32,
     snap_at: u64,
+    tabs_ev_ms: u64,  // last TabUpdate (see EVENT_HOLD_MS)
+    panes_ev_ms: u64, // last PaneUpdate
     plugin_ids: Vec<u32>,
     primed: bool,
     cwd_names: HashMap<usize, String>,        // tab position -> basename of its main pane's cwd
@@ -450,22 +458,27 @@ impl State {
             // running agents = hook markers (SubagentStart/Stop) UNION agents whose transcripts say they are
             // still running (claude-agents.sh, polled): neither source alone is reliable
             let mut ids = subagent_markers(&format!("{}/{}.sub", dir, pane), self.subagent_stale_s);
-            // ignore a transcript scan older than 10 s: only the focused tab's instance (and the leader)
-            // polls, so a stale non-empty list in another instance would keep a finished tab "Working"
-            let fresh = self.task_at.get(&pane).map_or(false, |a| now_secs().saturating_sub(*a) < 10);
-            if let Some(t) = self.task_running.get(&pane).filter(|_| fresh) {
-                for id in t {
-                    if !ids.contains(id) {
-                        ids.push(id.clone());
-                    }
+            // ignore a transcript scan older than AGENTS_FRESH_S: only the focused tab's instance (and the
+            // leader) polls, so a stale non-empty list in another instance would keep a finished tab "Working".
+            // The polling instances share their result through <pane>.agents, so every instance (also one whose
+            // tab was just focused and has not polled yet) shows the same count.
+            let fresh = self.task_at.get(&pane).map_or(false, |a| now_secs().saturating_sub(*a) < AGENTS_FRESH_S);
+            let mut scanned: Vec<String> = self.task_running.get(&pane).filter(|_| fresh).cloned().unwrap_or_default();
+            let shared = format!("{}/{}.agents", dir, pane);
+            let shared_age = age_of(std::fs::metadata(&shared).ok());
+            if shared_age.map_or(false, |a| a.as_secs() < AGENTS_FRESH_S) {
+                scanned.extend(std::fs::read_to_string(&shared).unwrap_or_default().lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()));
+            }
+            for id in scanned {
+                if !ids.contains(&id) {
+                    ids.push(id);
                 }
             }
             let subs = ids.len();
             let sess = std::fs::read_to_string(format!("{}/{}.sess", dir, pane)).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
             // safety net: any hook event newer than the last state change, within working_hold_s, means busy
-            let age = |m: Option<std::fs::Metadata>| m.and_then(|m| m.modified().ok()).and_then(|t| t.elapsed().ok());
-            let st_age = age(e.metadata().ok());
-            let ev_age = age(std::fs::metadata(format!("{}/{}.ev", dir, pane)).ok());
+            let st_age = age_of(e.metadata().ok());
+            let ev_age = age_of(std::fs::metadata(format!("{}/{}.ev", dir, pane)).ok());
             let recent_activity = match (st_age, ev_age) {
                 (Some(sa), Some(ea)) => {
                     ea.as_secs() < self.working_hold_s && sa > ea + std::time::Duration::from_secs(1)
@@ -996,21 +1009,23 @@ impl State {
         let Some(si) = snap.live_sessions.into_iter().find(|s| s.is_current_session) else { return false };
         self.snap_at = now_secs();
         self.session = si.name.clone();
-        self.tabs = si.tabs;
-        self.manifest = Some(si.panes);
         // live claude-tabs panes only (the server's plugin table can still list instances from before a reload)
-        self.plugin_ids = self
-            .manifest
-            .as_ref()
-            .map(|m| {
-                m.panes
-                    .values()
-                    .flatten()
-                    .filter(|p| p.is_plugin && (p.title.contains("claude-tabs") || p.plugin_url.as_deref().map_or(false, |u| u.contains("claude-tabs"))))
-                    .map(|p| p.id)
-                    .collect()
-            })
-            .unwrap_or_default();
+        self.plugin_ids = si
+            .panes
+            .panes
+            .values()
+            .flatten()
+            .filter(|p| p.is_plugin && (p.title.contains("claude-tabs") || p.plugin_url.as_deref().map_or(false, |u| u.contains("claude-tabs"))))
+            .map(|p| p.id)
+            .collect();
+        // the snapshot lags behind Tab/PaneUpdate: keep what an event delivered lately
+        let t = now_ms();
+        if !event_holds(self.tabs_ev_ms, t) {
+            self.tabs = si.tabs;
+        }
+        if !event_holds(self.panes_ev_ms, t) {
+            self.manifest = Some(si.panes);
+        }
         true
     }
 
@@ -1051,6 +1066,7 @@ impl State {
             let _ = std::fs::remove_file(format!("{}/{}.attn", dir, k));
             let _ = std::fs::remove_file(format!("{}/{}.attn-seen", dir, k));
             let _ = std::fs::remove_file(format!("{}/{}.sess", dir, k));
+            let _ = std::fs::remove_file(format!("{}/{}.agents", dir, k));
             // the hook's duplicate-event markers <pane>.once.<key>
             if let Ok(rd) = std::fs::read_dir(&dir) {
                 let pre = format!("{}.once.", k);
@@ -1275,6 +1291,16 @@ fn subagent_markers(dir: &str, stale_s: u64) -> Vec<String> {
     ages.iter().filter_map(|(p, _)| p.file_name().map(|n| n.to_string_lossy().to_string())).collect()
 }
 
+// age of a file from its metadata (None = unknown / in the future)
+fn age_of(m: Option<std::fs::Metadata>) -> Option<std::time::Duration> {
+    m.and_then(|m| m.modified().ok()).and_then(|t| t.elapsed().ok())
+}
+
+// a Tab/PaneUpdate received at `ev_ms` still wins over a session snapshot taken at `now_ms`
+fn event_holds(ev_ms: u64, now_ms: u64) -> bool {
+    ev_ms > 0 && now_ms.saturating_sub(ev_ms) < EVENT_HOLD_MS
+}
+
 // accent colour mixed 75/25 with the theme foreground
 fn blend(rgb: (u8, u8, u8), theme: PaletteColor) -> PaletteColor {
     match theme {
@@ -1452,11 +1478,13 @@ impl ZellijPlugin for State {
                     self.last_names.insert(x.tab_id, x.name.clone());
                 }
                 self.tabs = t;
+                self.tabs_ev_ms = now_ms();
                 self.refresh();
                 changed
             }
             Event::PaneUpdate(m) => {
                 self.manifest = Some(m);
+                self.panes_ev_ms = now_ms();
                 self.refresh_names();
                 self.refresh();
                 true
@@ -1546,6 +1574,15 @@ impl ZellijPlugin for State {
                                 .collect();
                             v.sort();
                             self.task_at.insert(pane, now_secs());
+                            // share with the other instances (atomic: temp file + rename)
+                            if !self.session.is_empty() {
+                                let path = format!("{}/{}/{}.agents", STATE_ROOT, self.session, pane);
+                                let tmp = format!("{}.{}", path, self.my_id);
+                                let body: String = v.iter().map(|l| format!("{}\n", l)).collect();
+                                if std::fs::write(&tmp, body).is_ok() {
+                                    let _ = std::fs::rename(&tmp, &path);
+                                }
+                            }
                             if self.task_running.get(&pane) != Some(&v) {
                                 self.task_running.insert(pane, v);
                                 redraw = true;
@@ -2023,6 +2060,15 @@ mod tests {
         assert_eq!(badge_candidates("X")[0], "X ");
         assert_eq!(badge_candidates("42")[0], "42");
         assert_eq!(badge_candidates("straße")[0], "ST");
+    }
+
+    #[test]
+    fn events_win_over_snapshot_briefly() {
+        assert!(!event_holds(0, 10_000)); // no event yet: snapshot applies
+        assert!(event_holds(9_000, 10_000));
+        assert!(event_holds(10_000, 10_000));
+        assert!(!event_holds(10_000 - EVENT_HOLD_MS, 10_000));
+        assert!(event_holds(10_500, 10_000)); // clock step back: keep the event
     }
 
     #[test]
