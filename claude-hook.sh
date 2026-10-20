@@ -143,9 +143,15 @@ case "$1" in
            [ "$cur" = working ] || write working
            exit 0 ;;
   ask|notify) attn_raise "$@" ;;
-  clear)   # PostToolUse / PostToolUseFailure: cheap no-op unless an attention request is pending
-           [ -e "$f.attn" ] || [ -e "$f.attn-seen" ] || exit 0
-           attn_drop "$2" && : >"$f.ev" || exit 0 ;;
+  clear)   # PostToolUse / PostToolUseFailure: cheap no-op unless an attention request is pending or the
+           # tool was TaskStop (a stopped background agent sends no SubagentStop: drop its marker here)
+           _p=""
+           if [ "$(json_str tool_name "$2")" = TaskStop ]; then
+             _t=$(json_str task_id "$2" | tr -c 'A-Za-z0-9_\n-' '_')
+             [ -n "$_t" ] && [ -e "$sub/$_t" ] && rm -f "$sub/$_t" && _p=1
+           fi
+           if [ -e "$f.attn" ] || [ -e "$f.attn-seen" ]; then attn_drop "$2" && : >"$f.ev" && _p=1; fi
+           [ -n "$_p" ] || exit 0 ;;
   start)   rm -rf "$sub"; rm -f "$f.attn" "$f.attn-seen"; write idle ;;
   working) rm -f "$f.attn" "$f.attn-seen"; write working ;;
   done)    # background subagents may outlive the main turn: keep their markers, and tell the plugin that
@@ -154,6 +160,11 @@ case "$1" in
            case $stale_s in ''|*[!0-9]*) stale_s=900 ;; esac
            stale_min=$(( stale_s / 60 ))
            running=""
+           # drop the markers of agents whose transcript says finished (killed by the user / TaskStop:
+           # no SubagentStop ever arrives, the marker would count as running for ZELLIJ_CLAUDE_STALE_S)
+           if [ -f "$f.sess" ] && [ -d "$sub" ]; then
+             sh "$here/claude-agents.sh" --finished "$(cat "$f.sess")" "$sub" 2>/dev/null | while read -r _i; do rm -f "$sub/$_i"; done
+           fi
            [ -f "$f.sess" ] && running=$(sh "$here/claude-agents.sh" "$(cat "$f.sess")" 2>/dev/null | head -n 1)
            # " away" = the terminal window showing this session is not the OS-focused window (os-focus.sh;
            # unknown counts as not away); the plugin then also dings/blinks the active tab.

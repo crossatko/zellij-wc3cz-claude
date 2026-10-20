@@ -149,11 +149,22 @@ written blind.
   Verified in an isolated headless session (fresh cache -> prompt, focus, `y` -> grant, `n` -> no panic).
   Not verified: several tabs open while the prompt is pending, terminals narrower than the prompt.
 - Running agents = UNION of hook markers and `claude-agents.sh <transcript>/subagents` (agent-<id>.jsonl
-  modified < 10 min whose last line lacks `"stop_reason":"end_turn"`; newest 40 of last 30 min). Real data:
+  modified < 10 min whose last MESSAGE record is not an assistant end_turn/stop_sequence/refusal and not a user
+  `[Request interrupted by user...]`; newest 40 of last 30 min). Real data:
   a hand-back arrives as SubagentStop only, the main thread then runs turns without UserPromptSubmit (hence
   the `tool` hook), SubagentStart is unreliable. The agent scan is per instance; entries carry a timestamp
   (`task_at`) and are ignored after 10 s, the leader polls (`ask_agents`) from its tick (else a stale list in
   an inactive leader kept finished tabs Working and delayed the ding until focus).
+- Killed agents (Claude Code 2.1.30x, real session): `TaskStop` (or a kill by the user) ends the agent's
+  transcript with a user record `[Request interrupted by user]` and sends NO SubagentStop, so its marker
+  stayed and the tab showed Working / "1 agent running" and deferred the ding until `subagent_stale_s`
+  (900 s) expired it (seen: marker 23:18:08 -> plugin removed it 15 min later, ding 10 s after). Fix
+  (script-only): `clear` (PostToolUse) of `TaskStop` removes `<pane>.sub/<task_id>`; every Stop first runs
+  `claude-agents.sh --finished <subagents> <pane>.sub` and drops markers whose transcript is finished and not
+  older than the marker (a resumed agent's new marker stays). Verified: `tests/subagents.sh` (simulated
+  payloads) and `--finished` on 237 real transcripts (the killed one detected). NOT verified: the real
+  PostToolUse payload of TaskStop (assumed `tool_input.task_id` = agent id; a named agent's name would not
+  match its marker, the Stop reconcile still catches it); a kill from the UI task list (assumed same transcript).
 - Ding only on a real finish: a Stop while agents run is `done <ns> sub` (still Working); after the last one
   stops wait `subagent_grace_s` (8), then ding. Markers older than `subagent_stale_s` (900, hook env
   `ZELLIJ_CLAUDE_STALE_S`) are ignored, > 6 h dropped. `working_hold_s` (20): any hook event newer than the
@@ -375,7 +386,8 @@ written blind.
   config (README); colour icons are unverified on macOS and other terminals. Such users set `race_font off`.
 - Once after a reload one finish produced two identical dings (two instances acted); not reproduced.
 - After a reload, tabs whose last Stop was `done ... sub` show the spinner for the grace period.
-- The subagent count depends on hooks/transcripts; a missed stop sticks until stale/end/pane close.
+- The subagent count depends on hooks/transcripts; a missed stop (other than TaskStop/kill, see above) sticks
+  until the next Stop finds the transcript finished, stale (900 s), end or pane close.
 - Sessions started before a plugin-option change keep the old options; a new session picks them up.
 - Voice library: the owner's transcript edit is applied (2026-10-20); two boundaries could not be cut (see Sounds).
 
@@ -396,6 +408,7 @@ written blind.
 - Open: the Known issues above; test on a Mac and other desktops/terminals; the marketplace install from
   GitHub (the repo is public) has never been run end to end; Bluetooth wake-up clipping of the first ms
   of a voice line is an untested hypothesis (try `lead_in_ms`).
+- Tests: `sh tests/subagents.sh` (hook/agents scripts, private TMPDIR, stub zellij), `cargo test` (wasm).
 - Resume: `sh setup.sh` (status), `./dev.sh -s <isolated session>` (build + reload), `claude plugin
   validate .`; rebuild and commit the wasm after every source change.
 - Install audit (Linux, kitty, checkout + Claude Code plugin both present): hooks only via the plugin (cache dir =

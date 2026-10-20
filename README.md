@@ -271,7 +271,7 @@ strings or bare true/false (`true/1/yes/on`, `false/0/no/off`); they are read wh
 | `ding_when_os_unfocused` | `true` | ding and blink the ACTIVE tab too when the terminal window was not the OS-focused window at the finish (see "Away from the terminal") |
 | `ding_with_subagents` | `false` | ding on every Stop, even while subagents run |
 | `subagent_grace_s` | `8` | wait after the last subagent stops before dinging (main agent may continue) |
-| `subagent_stale_s` | `900` | ignore subagent markers older than this (missed SubagentStop) |
+| `subagent_stale_s` | `900` | ignore subagent markers older than this (missed SubagentStop; an agent stopped with TaskStop or killed is cleared at once / at the next Stop) |
 | `working_hold_s` | `20` | any hook event keeps the working look this long |
 | `auto_switch` | `false` | switch to a tab whose agent finished |
 | `auto_name` | `true` | label tabs with the folder of their main pane (user-chosen names win) |
