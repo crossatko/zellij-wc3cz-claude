@@ -384,6 +384,7 @@ struct State {
     player: String,
     lead_in_ms: u64,   // silence played before a clip (wakes a sleeping sink), 0 = off
     dup_window_ms: u64, // same-character dings closer than this are one
+    max_clip_s: String, // longest clip to play, seconds (fractional ok), empty = no limit
     tz_offset: Option<i64>,
     tz_asked: u64,
     my_id: u32,
@@ -1204,6 +1205,7 @@ impl State {
                 concat!(
                     "p=$1; d=$2; c=$3; pl=$4; dc=$5; ",
                     "export CLAUDE_TABS_LEAD_IN_MS=$6 CLAUDE_TABS_DUP_MS=$7 CLAUDE_TABS_TRIGGER=$8 CLAUDE_TABS_WHO=$9; ",
+                    "[ -z \"${10}\" ] || export ZELLIJ_CLAUDE_MAX_CLIP_S=${10}; ",
                     "case $p in '~/'*) p=$HOME/${p#'~/'};; esac; case $d in '~'|'~/'*) d=$HOME${d#'~'};; esac; ",
                     "case $pl in '~/'*) pl=$HOME/${pl#'~/'};; esac; ",
                     "if [ -n \"$c\" ] && [ -n \"$p\" ] && [ -f \"$p\" ]; then sh \"$p\" \"$d\" \"$c\" \"$pl\"; r=$?; [ $r -eq 3 ] || exit $r; fi; ",
@@ -1220,9 +1222,28 @@ impl State {
                 &self.dup_window_ms.to_string(),
                 trigger,
                 &who,
+                &self.max_clip_s,
             ],
             ctx,
         );
+    }
+}
+
+// max_clip_s option -> value for play-phrase.sh: seconds as plain decimal text, empty = no limit
+// (unset, 0, negative, non-numeric or non-finite).
+fn parse_max_clip_s(v: &str) -> String {
+    match v.trim().parse::<f64>() {
+        Ok(x) if x.is_finite() && x > 0.0 => {
+            let ms = (x.min(86400.0) * 1000.0).round() as u64;
+            if ms == 0 {
+                String::new()
+            } else if ms % 1000 == 0 {
+                (ms / 1000).to_string()
+            } else {
+                format!("{}.{:03}", ms / 1000, ms % 1000).trim_end_matches('0').to_string()
+            }
+        }
+        _ => String::new(),
     }
 }
 
@@ -1367,6 +1388,7 @@ impl ZellijPlugin for State {
         self.player = cfg.get("player").cloned().unwrap_or_default(); // empty = autodetect in play-phrase.sh
         self.lead_in_ms = cfg.get("lead_in_ms").and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(0).min(3000);
         self.dup_window_ms = cfg.get("dup_window_ms").and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(2000).min(30000);
+        self.max_clip_s = parse_max_clip_s(cfg.get("max_clip_s").map(|v| v.as_str()).unwrap_or(""));
         self.my_id = get_plugin_ids().plugin_id;
         // stay selectable until the permission question is resolved: zellij draws its one-time
         // "Allow? (y/n)" prompt in this pane and only a focused pane gets the `y`. Made unselectable on
@@ -1961,6 +1983,21 @@ impl State {
 mod tests {
     use super::*;
     use unicode_width::UnicodeWidthStr;
+
+    #[test]
+    fn max_clip_s_parsing() {
+        assert_eq!(parse_max_clip_s(""), "");
+        assert_eq!(parse_max_clip_s("0"), "");
+        assert_eq!(parse_max_clip_s("-3"), "");
+        assert_eq!(parse_max_clip_s("abc"), "");
+        assert_eq!(parse_max_clip_s("NaN"), "");
+        assert_eq!(parse_max_clip_s("inf"), "");
+        assert_eq!(parse_max_clip_s("3"), "3");
+        assert_eq!(parse_max_clip_s(" 12.5 "), "12.5");
+        assert_eq!(parse_max_clip_s("8.0"), "8");
+        assert_eq!(parse_max_clip_s("0.25"), "0.25");
+        assert_eq!(parse_max_clip_s("1e1"), "10");
+    }
 
     // cargo test --target x86_64-unknown-linux-gnu -- --nocapture   (prints the badge table)
     #[test]
