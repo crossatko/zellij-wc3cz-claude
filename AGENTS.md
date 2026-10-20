@@ -272,7 +272,7 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   protocol), so `os-focus.sh [SESSION]` asks the desktop: focused window pid+title (macOS lsappinfo /
   osascript, Hyprland hyprctl, Sway swaymsg+jq, KDE Wayland kdotool, X11 xdotool/xprop; X11 tools are
   never trusted on Wayland; GNOME Wayland = unknown). Decision: title `<session> | ...` = focused
-  (zellij 0.45 titles the host terminal like that; seen on this machine: `profound-newt | ✳ Claude Code`);
+  (zellij 0.45 titles the host terminal like that; seen on this machine: `my-session | ✳ Claude Code`);
   else focused pid is an ancestor of a client of the session (Linux: `ss -xpH`, server-side sockets with
   local path `.../contract_version_1/<session>` give the client socket inode as peer -> client pid;
   else every `zellij` client process from ps) and the title does not name another running session.
@@ -294,8 +294,8 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   backend -> unknown after 1 s).
 - Stale title bug (2026-10-20, owner: "finished tab flashes forever while I am on it"): zellij only rewrites
   the host terminal title when a pane title changes, so after switching session INSIDE one client (session
-  manager) the title still names the OLD session (`quiet-magpie | Session Manager` while viewing
-  profound-horse). os-focus.sh then answered `unfocused` forever (title names another running session), so
+  manager) the title still names the OLD session (`other-session | Session Manager` while viewing
+  my-session). os-focus.sh then answered `unfocused` forever (title names another running session), so
   the `away` finish was never acknowledged and kept blinking. Reproduced in isolated sessions (client in
   `pktest-b`, switch to `pktest-blink` through the session manager with keys sent to MY headless client;
   title stayed `pktest-b | ...`; stub hyprctl taking the title from the client's real OSC 0). Fix in
@@ -400,7 +400,7 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   `--link --font --permissions`, or switch to the plugin route). `~/.claude/settings.json` hooks point at
   this checkout's `claude-hook.sh` (legacy route; installing the plugin too would double every hook:
   run `setup.sh --migrate-to-plugin` then).
-- Live sessions started before the move (profound-newt, profound-cuckoo on 2026-10-20) run the old wasm
+- Live sessions started before the move (two sessions on 2026-10-20) run the old wasm
   whose default script path `~/.config/zellij/play-phrase.sh` no longer exists: no voice lines, no
   transcript-based agent counts (log: `scan found []`) until `./dev.sh -s <session>` reloads the new wasm
   (not done by the agent) or the session is restarted.
