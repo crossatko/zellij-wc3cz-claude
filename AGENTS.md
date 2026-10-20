@@ -99,11 +99,15 @@ written blind.
   `target/wasm32-wasip1/release/claude-tabs.wasm` over `claude-tabs.wasm` (`dev.sh`, `setup.sh --build`).
   Unit tests: `cargo test --target x86_64-unknown-linux-gnu`.
 - Hot reload: `./dev.sh [-s SESSION | --all] [--watch] [-p URL | -a [NAME]]` = build, copy, then
-  `zellij --session S action start-or-reload-plugin file:<abs checkout wasm>` (reloads every per-tab
-  instance of the plugin loaded under THAT url; an alias is optional, `-a` reloads via an alias). Layouts
-  that load the marketplace clone need `-p`. "reload requested" does not prove a plugin was found. A reload
-  picks up the new wasm, NOT new plugin options (fixed at session start). `--watch`: inotifywait, fswatch,
-  entr, else 1 s polling.
+  `zellij --session S action start-or-reload-plugin X` (reloads every per-tab instance of the plugin loaded
+  as exactly X). X that matches nothing LAUNCHES a new plugin pane in the focused tab (it once split a live
+  Claude pane), so dev.sh first checks `list-panes -a` (columns split by two spaces; column 7 = the location
+  string the pane was loaded with) and only reloads with a target present in the session: autodetect =
+  alias `claude-tabs`, else `file:<checkout>/claude-tabs.wasm`, else REFUSE with rc 1 (also for `-p`/`-a`
+  values that are not present). Layouts loading another path/symlink/marketplace clone need `-p` with that
+  exact string. Verified in isolated sessions (alias, exact path, symlinked path -> refused): pane count
+  unchanged each time. A reload picks up the new wasm, NOT new plugin options (fixed at session start).
+  `--watch`: inotifywait, fswatch, entr, else 1 s polling.
 - Test in an ISOLATED session with its own `ZELLIJ_CONFIG_DIR`/`XDG_CACHE_HOME`, a test wasm copy and a stub
   player; drive it with simulated hook calls (`ZELLIJ=0 ZELLIJ_SESSION_NAME=<test> ZELLIJ_PANE_ID=N sh
   claude-hook.sh done </dev/null`). Never kill or reshuffle someone's live sessions. No screenshots of the

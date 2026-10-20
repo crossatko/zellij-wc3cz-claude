@@ -327,6 +327,7 @@ The config loads the TRACKED `claude-tabs.wasm`. After changing `src/`:
 ```sh
 cd <pkg>
 ./dev.sh -s <session>      # cargo build --release --target wasm32-wasip1, copy to claude-tabs.wasm, hot reload
+                           # (reloads only a plugin present in the session; otherwise refuses, use -p <exact location>)
 git add claude-tabs.wasm   # commit the rebuilt wasm together with the source change
 ```
 

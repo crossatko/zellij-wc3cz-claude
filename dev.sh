@@ -5,17 +5,20 @@
 #   dev.sh -s NAME         ... in session NAME
 #   dev.sh --all           ... in every running (not exited) session
 #   dev.sh --watch [...]   rebuild + reload whenever src/, Cargo.toml changes (inotifywait, fswatch, entr or polling)
-#   dev.sh -p URL          reload the plugin loaded as URL (default file:<this checkout>/claude-tabs.wasm)
-#   dev.sh -a [NAME]       reload through the plugin alias NAME (default claude-tabs) from config.kdl instead
-# `zellij action start-or-reload-plugin URL` reloads every instance (one per tab) of the plugin that was LOADED
-# FROM EXACTLY THAT URL: it must equal the `location` of the layout (same path, no symlink resolving; a layout
-# that loads the marketplace clone needs -p "file:~/.claude/plugins/marketplaces/zellij-wc3cz/claude-tabs.wasm"
-# and a copy of the new wasm there). An unknown URL or alias is not an error for zellij (it only logs one), so
-# "reload requested" does not prove a plugin was found. Alias options and layout options are NOT re-read.
+#   dev.sh -p URL          reload the plugin loaded as exactly URL
+#   dev.sh -a [NAME]       reload through the plugin alias NAME (default claude-tabs)
+# Without -p/-a each session is inspected (`zellij action list-panes -a`, COMMAND column = the location string
+# the plugin pane was loaded with): alias `claude-tabs` if a plugin pane was loaded through it, else
+# file:<this checkout>/claude-tabs.wasm if a plugin pane has exactly that location, else the session is
+# REFUSED (non-zero exit). `zellij action start-or-reload-plugin X` reloads every instance (one per tab) of
+# the plugin loaded from exactly X, but when X matches nothing it LAUNCHES a new plugin pane in the focused
+# tab, so dev.sh never calls it with a target that is not already present in the session. A layout that
+# loads the plugin from another path or a symlink needs -p with that exact string (and a copy of the new
+# wasm there). Alias options and layout options are NOT re-read by a reload.
 set -u
 cd "$(dirname "$0")" || exit 1
 mode=cur; session=${ZELLIJ_SESSION_NAME:-}; watch=0
-target="file:$PWD/claude-tabs.wasm"
+target=""; own="file:$PWD/claude-tabs.wasm"
 while [ $# -gt 0 ]; do
   case "$1" in
     --all) mode=all ;;
@@ -23,11 +26,18 @@ while [ $# -gt 0 ]; do
     --watch) watch=1 ;;
     -p) shift; [ $# -gt 0 ] || { echo "-p needs a URL" >&2; exit 2; }; target=$1 ;;
     -a) target=claude-tabs; case "${2:-}" in ""|-*) ;; *) shift; target=$1 ;; esac ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
 done
+
+# does session $1 have a plugin pane whose location string is exactly $2? (list-panes columns are separated
+# by two spaces: tab id, pos, tab name, pane id, type, title, command, ...)
+has_plugin() {
+  zellij --session "$1" action list-panes -a 2>/dev/null |
+    awk -F'  ' -v t="$2" '$5 == "plugin" && $7 == t { f = 1 } END { exit !f }'
+}
 
 reload() {
   if [ "$mode" = all ]; then
@@ -37,13 +47,24 @@ reload() {
     sessions=$session
   fi
   [ -n "$sessions" ] || { echo "no session to reload (not inside zellij? use -s NAME or --all)" >&2; return 1; }
+  rc=0
   for s in $sessions; do
-    if zellij --session "$s" action start-or-reload-plugin "$target" >/dev/null 2>&1; then
-      echo "reload requested in $s ($target)"
+    if [ -n "$target" ]; then t=$target
+    elif has_plugin "$s" claude-tabs; then t=claude-tabs
+    elif has_plugin "$s" "$own"; then t=$own
+    else t=
+    fi
+    if [ -z "$t" ] || ! has_plugin "$s" "$t"; then
+      echo "refused in $s: no plugin pane loaded as '${t:-claude-tabs}' or '$own' (reloading an unknown location would open a new pane); use -p with the exact location of the layout" >&2
+      rc=1; continue
+    fi
+    if zellij --session "$s" action start-or-reload-plugin "$t" >/dev/null 2>&1; then
+      echo "reload requested in $s ($t)"
     else
-      echo "reload failed in $s" >&2
+      echo "reload failed in $s" >&2; rc=1
     fi
   done
+  return $rc
 }
 
 once() {
@@ -53,8 +74,8 @@ once() {
   reload
 }
 
-once
-[ "$watch" = 1 ] || exit $?
+once; rc=$?
+[ "$watch" = 1 ] || exit $rc
 
 echo "watching src/ and Cargo.toml (ctrl-c to stop)"
 if command -v inotifywait >/dev/null 2>&1; then
