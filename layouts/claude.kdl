@@ -1,6 +1,18 @@
+// claude-tabs: zellij's "compact" layout with the claude-tabs bar instead of compact-bar.
+// Use it without touching any config file:   zellij -n <this file>   (new session; --layout inside a session adds tabs)
+// or copy it to ~/.config/zellij/layouts/claude.kdl and start with   zellij -n claude
+//
+// location = where claude-tabs.wasm is on disk (zellij needs an absolute or ~ path; a relative path is
+// resolved against the session's cwd, not this file):
+//   - installed as a Claude Code plugin from GitHub: the marketplace clone below
+//     (with CLAUDE_CONFIG_DIR set: $CLAUDE_CONFIG_DIR/plugins/marketplaces/zellij-wc3cz/claude-tabs.wasm)
+//   - a git checkout: file:/path/to/zellij-wc3cz-claude/claude-tabs.wasm
+// zellij asks once for the plugin's permissions (press y); the grant is remembered for this exact path.
+// Plugin options (README "Options") go into the plugin block, e.g. ding_when_focused false.
 layout {
-  pane
-  pane size=1 borderless=true {
-    plugin location="claude-tabs"
-  }
+    pane
+    pane size=1 borderless=true {
+        plugin location="file:~/.claude/plugins/marketplaces/zellij-wc3cz/claude-tabs.wasm" {
+        }
+    }
 }

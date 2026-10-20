@@ -1,0 +1,9 @@
+{
+  "name": "zellij-wc3cz",
+  "displayName": "zellij claude-tabs (WC3 CZ)",
+  "description": "Hooks for the claude-tabs zellij tab bar: Claude Code working/finished/attention state per tab, Czech Warcraft III voice lines. The zellij plugin itself is loaded from a zellij layout (see README).",
+  "author": { "name": "Paul Cross" },
+  "homepage": "https://github.com/crossatko/zellij-wc3cz-claude",
+  "repository": "https://github.com/crossatko/zellij-wc3cz-claude",
+  "keywords": ["zellij", "tab-bar", "hooks", "notifications", "warcraft"]
+}

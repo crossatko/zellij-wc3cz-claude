@@ -1,0 +1,12 @@
+{
+  "name": "zellij-wc3cz",
+  "description": "claude-tabs: a Claude Code aware tab bar for zellij",
+  "owner": { "name": "Paul Cross" },
+  "plugins": [
+    {
+      "name": "zellij-wc3cz",
+      "source": "./",
+      "description": "Hooks for the claude-tabs zellij tab bar (working/finished/attention per tab, WC3 voice lines)"
+    }
+  ]
+}
