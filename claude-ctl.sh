@@ -15,13 +15,14 @@ while [ -h "$self" ]; do
 done
 here=$(cd -P "${self%/*}/" 2>/dev/null && pwd -P) || here=$(dirname "$0")
 . "$here/claude-lib.sh"
-cmd=$1; arg=${2:-active}
+cmd=${1:-}; arg=${2:-active}
+usage() { echo "usage: $0 ding [character] | character <name> | race <race> | reshuffle" >&2; exit 2; }
 case "$cmd" in
   ding) name=claude_ding ;;
-  character) name=claude_character ;;
-  race) name=claude_race ;;
+  character) [ -n "${2:-}" ] || usage; name=claude_character ;;
+  race) [ -n "${2:-}" ] || usage; name=claude_race ;;
   reshuffle) name=claude_reshuffle; arg=now ;;
-  *) echo "usage: $0 ding [character] | character <name> | race <race> | reshuffle" >&2; exit 2 ;;
+  *) usage ;;
 esac
 printf '%s' "$arg" | run_timeout 2 zellij pipe --name "$name" >/dev/null 2>&1
 exit 0

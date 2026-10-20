@@ -13,7 +13,7 @@
 #                                  <file>.bak-claude-tabs, other hooks/keys untouched, idempotent
 #   setup.sh --link                LEGACY: link <zellij config dir>/plugins/claude-tabs -> this checkout
 #   setup.sh --legacy-settings-hooks  LEGACY: write the hooks into Claude settings files instead of using the
-#                                  plugin (do not combine with the plugin: every hook would run twice)
+#                                  plugin (use one route, not both: the script drops duplicate events)
 # Settings file targets for --migrate-to-plugin / --legacy-settings-hooks / the status check:
 #   --settings FILE (repeatable) and/or --all-claude-dirs (every ~/.claude* directory); default
 #   $CLAUDE_SETTINGS, else $CLAUDE_CONFIG_DIR/settings.json, else ~/.claude/settings.json.
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
     --settings) [ $# -ge 2 ] || { echo "--settings needs a path" >&2; exit 2; }; shift; add_target "$1" ;;
     --settings=*) add_target "${1#--settings=}" ;;
     --all-claude-dirs) all_dirs=1 ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
     *) echo "unknown option $1 (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -100,10 +100,12 @@ status() {
     [ -n "$s" ] || continue
     d=$(dirname "$s")
     p=no; plugin_installed "$d" && p=yes
+    command -v jq >/dev/null 2>&1 || p="unknown (needs jq)"
     h=no; settings_has_hooks "$s" && h=yes
+    command -v jq >/dev/null 2>&1 || h="unknown (needs jq)"
     echo "    $d: plugin $plugin_name installed: $p; old claude-hook.sh hooks in $(basename "$s"): $h"
     if [ "$p" = yes ] && [ "$h" = yes ]; then
-      echo "      DOUBLE REGISTRATION: every hook runs twice. Fix: $0 --migrate-to-plugin --settings $s"
+      echo "      DOUBLE REGISTRATION: both routes run (the script drops the duplicate event, but use one). Fix: $0 --migrate-to-plugin --settings $s"
     elif [ "$p" = no ]; then
       [ "$h" = yes ] && echo "      legacy settings hooks in use; to switch: install the plugin, then $0 --migrate-to-plugin --settings $s"
       [ "$h" = no ] && echo "      no hooks yet; install the plugin:"
@@ -169,15 +171,31 @@ if [ "$do_link" = 1 ]; then
 fi
 
 if [ "$do_perm" = 1 ]; then
-  mkdir -p "$zcache"
-  wasm_paths | while IFS= read -r w; do
-    if grep -qsF "\"$w\"" "$perms"; then
-      echo "  claude-tabs: permissions already granted for $w"
+  # append the missing grants to a copy of permissions.kdl in the same directory and rename it over the
+  # original (atomic; existing content kept byte for byte, a missing final newline is added first)
+  mkdir -p "$zcache" || rc=1
+  ptmp=$(mktemp "$zcache/.permissions.kdl.XXXXXX") || { echo "  claude-tabs: cannot write in $zcache" >&2; ptmp=; rc=1; }
+  if [ -n "$ptmp" ]; then
+    [ -f "$perms" ] && cat "$perms" >"$ptmp"
+    if [ -s "$ptmp" ] && [ -n "$(tail -c 1 "$ptmp")" ]; then printf '\n' >>"$ptmp"; fi
+    added=""
+    wasm_paths >"$ptmp.list"
+    while IFS= read -r w; do
+      if grep -qsF "\"$w\"" "$perms"; then
+        echo "  claude-tabs: permissions already granted for $w"
+      else
+        printf '"%s" {\n    ReadApplicationState\n    ChangeApplicationState\n    RunCommands\n    ReadCliPipes\n}\n' "$w" >>"$ptmp"
+        added="$added $w"
+      fi
+    done <"$ptmp.list"
+    rm -f "$ptmp.list"
+    if [ -n "$added" ]; then
+      if [ -f "$perms" ]; then chmod --reference="$perms" "$ptmp" 2>/dev/null || chmod 644 "$ptmp"; else chmod 644 "$ptmp"; fi
+      if mv -f "$ptmp" "$perms"; then echo "  claude-tabs: permissions pre-granted for$added in $perms"; else rm -f "$ptmp"; rc=1; fi
     else
-      printf '"%s" {\n    ReadApplicationState\n    ChangeApplicationState\n    RunCommands\n    ReadCliPipes\n}\n' "$w" >>"$perms" \
-        && echo "  claude-tabs: permissions pre-granted for $w in $perms"
+      rm -f "$ptmp"
     fi
-  done
+  fi
 fi
 
 [ "$do_hooks" = 1 ] || [ "$do_migrate" = 1 ] || exit $rc
@@ -247,7 +265,7 @@ edit_settings() {
            fi
     fi
     if [ "$do_hooks" = 1 ] && plugin_installed "$sdir"; then
-      echo "  claude-tabs: WARNING the $plugin_name plugin is installed in $sdir too: every hook now runs twice" >&2
+      echo "  claude-tabs: WARNING the $plugin_name plugin is installed in $sdir too: both hook routes now run (the duplicate event is dropped by the script, but use one route)" >&2
     fi
     if [ "$do_migrate" = 1 ] && ! plugin_installed "$sdir"; then
       echo "  claude-tabs: note: the $plugin_name plugin is not installed in $sdir; install it or there are no hooks"

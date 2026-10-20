@@ -5,17 +5,25 @@
 #   dev.sh -s NAME         ... in session NAME
 #   dev.sh --all           ... in every running (not exited) session
 #   dev.sh --watch [...]   rebuild + reload whenever src/, Cargo.toml changes (inotifywait, fswatch, entr or polling)
-# Reload goes through the `claude-tabs` plugin alias from config.kdl, which reloads every instance
-# (one per tab) of that alias. Sessions started before the alias existed need a restart once.
+#   dev.sh -p URL          reload the plugin loaded as URL (default file:<this checkout>/claude-tabs.wasm)
+#   dev.sh -a [NAME]       reload through the plugin alias NAME (default claude-tabs) from config.kdl instead
+# `zellij action start-or-reload-plugin URL` reloads every instance (one per tab) of the plugin that was LOADED
+# FROM EXACTLY THAT URL: it must equal the `location` of the layout (same path, no symlink resolving; a layout
+# that loads the marketplace clone needs -p "file:~/.claude/plugins/marketplaces/zellij-wc3cz/claude-tabs.wasm"
+# and a copy of the new wasm there). An unknown URL or alias is not an error for zellij (it only logs one), so
+# "reload requested" does not prove a plugin was found. Alias options and layout options are NOT re-read.
 set -u
 cd "$(dirname "$0")" || exit 1
 mode=cur; session=${ZELLIJ_SESSION_NAME:-}; watch=0
+target="file:$PWD/claude-tabs.wasm"
 while [ $# -gt 0 ]; do
   case "$1" in
     --all) mode=all ;;
     -s) shift; session=$1; mode=cur ;;
     --watch) watch=1 ;;
-    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+    -p) shift; [ $# -gt 0 ] || { echo "-p needs a URL" >&2; exit 2; }; target=$1 ;;
+    -a) target=claude-tabs; case "${2:-}" in ""|-*) ;; *) shift; target=$1 ;; esac ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
   shift
@@ -30,8 +38,8 @@ reload() {
   fi
   [ -n "$sessions" ] || { echo "no session to reload (not inside zellij? use -s NAME or --all)" >&2; return 1; }
   for s in $sessions; do
-    if zellij --session "$s" action start-or-reload-plugin claude-tabs >/dev/null 2>&1; then
-      echo "reloaded in $s"
+    if zellij --session "$s" action start-or-reload-plugin "$target" >/dev/null 2>&1; then
+      echo "reload requested in $s ($target)"
     else
       echo "reload failed in $s" >&2
     fi
