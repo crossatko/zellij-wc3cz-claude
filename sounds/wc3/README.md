@@ -31,9 +31,10 @@ git mv "_excluded/human/Kněz - Mohu nějak pomoci.flac" human/   # play it agai
 
 `manifest.tsv` records the packaging state (`status` active/excluded, `exclusion_reason`); it is
 informational, the folders are what counts. Exclusion reasons came from an independent review:
-`too long` (> 8 s), `too short` (< 0.7 s), `garbled/unintelligible-suspect` (transcript unreliable),
+`too short` (< 0.7 s), `garbled/unintelligible-suspect` (transcript unreliable),
 `uncertain-cut` (cut may clip a word), `loudness outlier` (> 2 LU off), `wrong-character-suspect`,
-`leftover music/noise`.
+`leftover music/noise`. Length is no exclusion reason: clips run up to about 25 s and the
+plugin option `max_clip_s` caps what is played.
 
 ## How the clips were made
 
