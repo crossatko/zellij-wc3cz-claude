@@ -121,8 +121,9 @@ each character gets its portrait:
 sh ${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/marketplaces/zellij-wc3cz/fontconfig/install.sh   # --uninstall to undo
 ```
 
-It writes two files that belong to this package (`~/.local/share/fonts/wc3-icons.ttf` and
-`~/.config/fontconfig/conf.d/60-wc3-icons.conf`, creating `~/.config/fontconfig/conf.d/` if missing),
+It writes three files that belong to this package (`~/.local/share/fonts/wc3-icons.ttf`,
+`~/.local/share/fonts/wc3-icons-wide.ttf` and `~/.config/fontconfig/conf.d/60-wc3-icons.conf`, creating
+`~/.config/fontconfig/conf.d/` if missing),
 runs `fc-cache` and drops the plugin's cached font flag; it edits no terminal config. Then close ALL
 windows of your terminal and start it again (a running kitty keeps its font set). If you installed the
 font after a hook already ran, the flag (`/tmp/zellij-$(id -u)/zellij-claude/font`, re-checked every 10
@@ -133,15 +134,25 @@ seven race fallback codepoints U+1F7E0..U+1F7E6 (the orange to brown circle emoj
 the usual status-dot emoji keep their look; a character without an icon in the font then shows the system
 circle emoji where the race glyph would be. Side effect: in every app that uses fontconfig the few emoji
 at the character codepoints (ballet shoes, ringed planet, chair, hamsa, ...) show WC3 portraits.
-Verified in kitty 0.49.2 on Linux (see the table); other terminals are untested. Per terminal:
+Two variants are installed: `WC3 Icons` (bitmap 112x144, for tall cells such as kitty with 110% line
+height) and `WC3 Icons Wide` (120x116, for cells about half as wide as tall, i.e. most fonts at 100% line
+height). Every terminal then needs one line of its own config (nothing below is edited by the script; fully
+restart the terminal afterwards, a running one keeps its fonts). Measured on Linux (Wayland) with Paper Mono,
+kitty 0.49.2, ghostty 1.3.1, alacritty 0.17.0, foot 1.28.0 (the glyphs were compared with the font's
+bitmaps; details in `assets/wc3-icons/README.md`):
 
-| Terminal | Colour icons after `fontconfig/install.sh` |
-|----------|--------------------------------------------|
-| kitty | the fontconfig rule alone is NOT enough on 0.49.2: kitty picks Noto Color Emoji for U+1FA70..U+1FAD6 (a Noto mirror ball instead of the Demon Hunter icon) although `fc-match` ranks WC3 Icons first. Add `symbol_map U+1FA70-U+1FAD6 WC3 Icons` to `kitty.conf` and restart kitty (all windows). Verified |
-| alacritty | needs an extra fontconfig family rule of your own (append `WC3 Icons` to your terminal font's family; `fontconfig/install.sh` prints an example) and probably `font.offset.y`, see `assets/wc3-icons/README.md`; not tested here |
-| wezterm, foot, konsole | untested |
-| ghostty | no: it ignores fontconfig for emoji; add `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons` to its config yourself |
-| macOS terminals | not supported (CoreText draws no CBDT bitmaps): initials badges |
+| Terminal | Config | Result (icon vs the 2-cell box) |
+|----------|--------|--------------------------------|
+| kitty | `kitty.conf`: `symbol_map U+1FA70-U+1FAD6 WC3 Icons` (fontconfig alone is not enough, kitty prefers Noto Color Emoji) | font_size 18 + `modify_font cell_height 110%` (14x36 cells): 28x36 in 28x36, pixel exact. Other sizes: undistorted, up to 2-4 px smaller than the box. Verified |
+| ghostty | config: `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons Wide` (it ignores fontconfig for emoji) | ghostty fits the icon into 2 cells x the font's NATURAL line height, centred, at any size: font-size 18 = 30x29 in 30x29, exact. `adjust-cell-height = N` leaves N px of background above/below (N=3: 2 px above, 1 below). With `WC3 Icons` instead: 22x29 (4 px side gaps). Verified |
+| foot | `foot.ini` `[main]`: `font=monospace:size=8,WC3 Icons:size=8` (the icon font as fallback, same size as the text font; needs the emoji tag that `install.sh` adds) | foot defaults (monospace 8 = 6x16 cells): 12x16 in 12x16 with `WC3 Icons`, exact. Paper Mono 18 (15x29): use `WC3 Icons Wide`, 30x29, exact. foot clips at the cell, so a wrong variant is cut off. Verified |
+| alacritty | a fontconfig rule (alacritty has no fallback setting), e.g. `~/.config/fontconfig/conf.d/61-wc3-icons-alacritty.conf`: `<match target="pattern"><test name="prgname"><string>alacritty</string></test><test name="family"><string>YOUR FONT</string></test><edit name="family" mode="append" binding="same"><string>WC3 Icons Wide</string></edit></match>` inside `<fontconfig>` | alacritty draws the bitmap at font_px/96, not fitted to the cell, bottom anchored at the baseline: Paper Mono 18 with `font.offset.y = 0` (15x29): 30x29, exact. Other line heights overflow into the line above (`offset.y = -2`: 2 px) or leave a gap; build a `WC3 Icons Custom` font for that cell (`assets/wc3-icons/README.md`, e.g. 15x27: 30x27 exact) and name it in the rule. The rule also makes alacritty draw the race icons for the circle emoji U+1F7E0..U+1F7E6. Verified |
+| wezterm, konsole, others | untested | |
+| macOS terminals | not supported (CoreText draws no CBDT bitmaps): initials badges | |
+
+A single bitmap cannot fit every cell: kitty and ghostty scale it to the cell, foot and alacritty draw it
+at the font size, so exact fits hold only for the settings named above (other sizes: smaller icon or gaps of
+1-4 px; never distorted).
 
 A terminal that cannot draw colour bitmap fonts shows another emoji or a box instead: set
 `race_font "false"` in the plugin block (initials badges) or run `fontconfig/install.sh --uninstall`.
@@ -156,7 +167,8 @@ macOS: the same two steps. Sounds play through `afplay` (FLAC needs macOS 10.13+
    zellij-wc3cz` (run both once per Claude config dir you installed it in). Hooks that an older `setup.sh`
    wrote into `settings.json`: `sh <pkg>/setup.sh --migrate-to-plugin` (before deleting the checkout).
 3. Icon font (and the `symbol_map` line you added to `kitty.conf`, if any): `sh <pkg>/fontconfig/install.sh --uninstall` (or `setup.sh --font-uninstall`) removes
-   `~/.local/share/fonts/wc3-icons.ttf` and `~/.config/fontconfig/conf.d/60-wc3-icons.conf`. While the font
+   `~/.local/share/fonts/wc3-icons.ttf`, `wc3-icons-wide.ttf` (and a `WC3 Icons Custom` build saved as
+   `wc3-icons-custom.ttf`) and `~/.config/fontconfig/conf.d/60-wc3-icons.conf`. While the font
    is installed it also answers for the emoji at the character codepoints in every fontconfig app.
 4. zellij permission grant (only if you answered `y` or ran `setup.sh --permissions`): delete the block whose
    header is the path of `claude-tabs.wasm` from zellij's `permissions.kdl` (Linux
@@ -370,11 +382,13 @@ rust-wasm`. `target/` is git-ignored.
   to `debug.log` there. Plugin errors: `grep claude-tabs /tmp/zellij-$(id -u)/zellij-log/zellij.log`.
 - **Icons missing / boxes / wrong emoji**: `sh <pkg>/fontconfig/install.sh --check` shows what fontconfig
   picks (`WC3 Icons` expected for `charset=1fa70`); install with `fontconfig/install.sh`, then restart the
-  terminal (close all its windows; kitty also needs the `symbol_map` line from the table). ghostty needs its `font-codepoint-map` line (Quick start table). A kitty
+  terminal (close all its windows); each terminal needs its line from the Quick start table (kitty
+  `symbol_map`, ghostty `font-codepoint-map`, foot `font=` fallback, alacritty a fontconfig rule). A kitty
   `symbol_map` must cover U+1FA70-U+1FAD6 (a stale U+F0100 range gives grey blobs). Still initials badges
   after installing the font: the font flag is cached, `rm /tmp/zellij-$(id -u)/zellij-claude/font`.
-  Terminals that cannot draw it: `race_font "false"` (initials badges). The font is tuned for reference
-  cells of 14x36 px (kitty font size 18, 110% line height; `assets/wc3-icons/README.md` to retune).
+  Terminals that cannot draw it: `race_font "false"` (initials badges). Icon too small, cut off or
+  overlapping the line above: pick the other variant (`WC3 Icons` for tall cells, `WC3 Icons Wide` for
+  ~1:2 cells) or build a `WC3 Icons Custom` for your cell (`assets/wc3-icons/README.md`).
 - **New option has no effect**: options are fixed at session start; start a new session.
 - **Old bar after an update**: sessions started before keep their plugin; `dev.sh -s SESSION` reloads
   the code, a new session picks up everything.

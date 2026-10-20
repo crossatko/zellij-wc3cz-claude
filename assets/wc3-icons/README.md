@@ -3,9 +3,11 @@
 `wc3-icons.ttf` is a tiny CBDT colour bitmap font (family `WC3 Icons`, 99 glyphs: 7 race icons +
 92 character icons) that the `claude-tabs` zellij plugin uses when `race_font` is on (`auto` = on when the
 hook finds the font installed with `fc-list`, Linux only; with `race_font false` or without the font the bar
-shows two-letter initials badges). Install it with `fontconfig/install.sh` (see Install); kitty then finds
-it through fontconfig. An explicit
-`symbol_map U+1FA70-U+1FAD6 WC3 Icons` line in `kitty.conf` also works but is optional.
+shows two-letter initials badges). Install it with `fontconfig/install.sh` (see Install); every terminal
+then needs one config line (kitty `symbol_map U+1FA70-U+1FAD6 WC3 Icons`, see the README Quick start table).
+
+`wc3-icons-wide.ttf` (family `WC3 Icons Wide`) has the same glyphs with a wider, shorter bitmap (120 x 116)
+for cells about half as wide as tall (ghostty, foot, alacritty at 100 % line height, see Terminals below).
 
 Race icons (`icons/`):
 
@@ -37,11 +39,11 @@ stay with the system emoji font, and a character without an icon glyph then show
 
 ## Install
 
-- Linux: `fontconfig/install.sh` (or `setup.sh --font`) copies `wc3-icons.ttf` to
-  `~/.local/share/fonts/wc3-icons.ttf`, writes `~/.config/fontconfig/conf.d/60-wc3-icons.conf`
-  (rules for the character codepoints only) and runs `fc-cache`. Then reload kitty
-  (ctrl+shift+f5) or restart it. Check: `fc-list | grep 'WC3 Icons'`, `fontconfig/install.sh --check`.
-  `--uninstall` removes both files.
+- Linux: `fontconfig/install.sh` (or `setup.sh --font`) copies `wc3-icons.ttf` and `wc3-icons-wide.ttf` to
+  `~/.local/share/fonts/`, writes `~/.config/fontconfig/conf.d/60-wc3-icons.conf` (prefer `WC3 Icons` for
+  the character codepoints only; tag the `WC3 Icons*` families as emoji fonts, lang `und-zsye`, which foot
+  needs) and runs `fc-cache -f` on the font dir. Then restart the terminal. Check: `fontconfig/install.sh --check`.
+  `--uninstall` removes the files (and a `WC3 Icons Custom` build saved as `wc3-icons-custom.ttf`).
 - macOS: NOT installed. kitty on macOS renders through CoreText, which has no CBDT support, so the
   plugin shows initials badges there (`race_font "auto"`).
 
@@ -52,14 +54,15 @@ stay with the system emoji font, and a character without an icon glyph then show
 ```sh
 cd assets/wc3-icons
 python3 build.py        # = FAMILY="WC3 Icons" PPEM=96 BY=116 ASPECT=0.7778 python3 build.py wc3-icons.ttf 1212 4 144
-cp wc3-icons.ttf ~/.local/share/fonts/ && fc-cache -f ~/.local/share/fonts   # then restart kitty
+FAMILY="WC3 Icons Wide" ASPECT=1.0345 BY=92 python3 build.py wc3-icons-wide.ttf 1212 4 116
+sh ../../fontconfig/install.sh   # installs both, then restart the terminal
 ```
 
 The font is about 2.9 MB (each glyph is a ~30 KB PNG strike). Arguments: advance width in font units (1212 = 2 cells), crop in px
 (removes the 4 px button frame, applied per icon only when `has_frame()` finds the grey frame; all 99 shipped icons
 have it), bitmap height in px (144). Env: `ASPECT` = bitmap width/height (0.7778, bitmap 112 x 144), `CROP_KEEP` = fraction of the width kept
 by the centre crop (default = `ASPECT`, so the icon is cropped to the bitmap aspect and NEVER squashed; a smaller
-value stretches, a larger one squashes), `PPEM` = strike size, `BY` = bearing Y, `BX` = bearing X.
+value stretches, a larger one squashes; above 1 the top and bottom are cropped instead, for wide bitmaps), `PPEM` = strike size, `BY` = bearing Y, `BX` = bearing X.
 
 Design: the bitmap is 112 x 144 strike px (aspect 0.7778, centre-cropped from the icon, never squashed) at PPEM 96.
 kitty at font_size 18 (24 px em) scales a strike by 24/96 = 0.25 -> exactly 28 x 36 px = the 2-cell box of the
@@ -80,51 +83,55 @@ icons, two stacked lines, no seam, no overlap, nothing drawn in the blank lines 
 Equivalent exact pairs for other box heights: `S/PPEM = ch/(font_px)`; for 14x36 also S 150 / PPEM 100 or
 S 147 / PPEM 98 give 36.0 but widths 28.1/27.7 (slightly worse), so 144/96 is the default.
 
-### Other cell sizes and terminals (measured 2026-10-20, Linux (Wayland), kitty 0.49.2, alacritty 0.17.0,
-ghostty 1.3.1; solid-colour test font, same bitmap geometry; "px" = measured ink box)
+### Terminals (measured 2026-10-21, Linux (Wayland), kitty 0.49.2, ghostty 1.3.1, alacritty 0.17.0, foot 1.28.0)
 
-kitty (`symbol_map`; cell sizes via font_size + `modify_font`, same bitmap):
+Method: one short-lived test window per terminal with an isolated config (private FONTCONFIG_FILE, test fonts
+under other family names), a test pattern (cell ruler, red rows above/below two stacked 2-cell icon slots on a
+blue background, a tab-bar mimic), a screenshot of that window only, then pixel analysis: a solid-green test
+build of the same geometry gives the exact ink box; the real build in the same settings is compared with the
+font's own PNG for that codepoint (mean abs error 3-10 of 255, vs 96-118 against Noto Color Emoji), so a
+fallback emoji or tofu would fail the test. Text font Paper Mono (cell 0.606 x 1.2 em). "box" = the 2-cell slot.
 
-| cell WxH | font_size | icon w x h (px) | gap top/bottom | left/right | note |
-|----------|-----------|-----------------|----------------|-----------|------|
-| 14x36 (reference) | 18, cell_height 110% | 28.0 x 36.0 | 0 / 0 | 0 / 0 | exact fit, no line |
-| 8x16  | 9  | 11.4 x 14.7 | 1.0 / 0.3 | 0 / 4.6 | undistorted, left aligned |
-| 10x22 | 11 | 16.2 x 20.7 | 1.3 / 0 | 0 / 3.8 | undistorted |
-| 18x40 | 24 | 30.2 x 36.0 | 4 / 0 | 0 / 5.8 | ~8 % wider than tall |
-| 9x30  | 11 + cell_height | 17.3 x 22.2 | 3 / 4.8 | 0 / 0.7 | undistorted |
-| 22x51 | 30 | not measured | | | |
+How each terminal sizes a colour bitmap (verified with variants of PPEM, BY, ascent/descent and aspect):
+- kitty: scale font_px/PPEM, shrunk by whole px to fit the box, bottom/left aligned. Pixel exact only when
+  S*font_px/PPEM = cell height and W*font_px/PPEM <= 2*cell width.
+- ghostty: ignores the font's size/PPEM/BY/ascent completely: fits the bitmap's aspect into
+  2 cells x the font's NATURAL line height (adjust-cell-height is not counted), centred. So only ASPECT matters.
+- foot (fcft) and alacritty: scale font_px/PPEM, NOT fitted; the top sits BY*scale above the baseline; foot
+  clips at the cell, alacritty overflows into the line above. foot uses a fallback font for these
+  emoji-presentation codepoints only if fontconfig gives it lang `und-zsye` (install.sh adds that tag).
 
-kitty keeps the aspect (within ~8 %), never exceeds the cell, and only the 14x36 reference is pixel exact; at
-other cell sizes the icon is smaller than the 2-cell box (left/bottom aligned) because the strike scales with
-the FONT size, not the cell. Retune (S/PPEM so that S*font_px/PPEM = cell height) for another fixed setup.
+| Terminal / settings | cells | WC3 Icons (112x144, BY 116) | WC3 Icons Wide (120x116, BY 92) |
+|---------------------|-------|-----------------------------|---------------------------------|
+| kitty 18, cell_height 110 % | 14x36 | 28x36, exact | (not for kitty) |
+| kitty 18, 100 % | 14x33 | 25x32, 1 px top, 3 px right | |
+| kitty 16, 110 % | 13x33 | 24x31, 2 px left/bottom | |
+| kitty 14, 110 % | 11x29 | 21x26 | |
+| kitty 12, 100 % | 10x22 | 16x20 | |
+| ghostty 18, adjust-cell-height 0 | 15x29 | 22x29, 4 px each side | 30x29, exact |
+| ghostty 18, adjust-cell-height 3 (or 10 %) | 15x32 | 22x29, 4 px sides, 2 px top, 1 px bottom | 30x29, 2 px top, 1 px bottom |
+| ghostty 16, adjust-cell-height 3 | 13x28 | 20x25 | |
+| ghostty 14 / 12, 0 | 11x23 / 10x19 | 18x23 / 14x19 (side gaps) | |
+| foot monospace 8 (defaults, Noto Sans Mono) | 6x16 | 12x16, exact | 13x12, 1 px over the right edge |
+| foot Paper Mono 18 | 15x29 | 28x29 visible (clipped) | 30x29, exact |
+| foot Paper Mono 12 | 10x20 | | 20x19, 1 px top |
+| alacritty 18, offset.y 0 | 15x29 | 28x35, 6 px over the line above | 30x29, exact |
+| alacritty 18, offset.y -2 | 15x27 | 28x35, 8 px over | 30x29, 2 px over |
+| alacritty 18, offset.y 6 | 15x35 | 28x35, 2 px right gap | |
+| alacritty 16 / 14 / 12, 0 | 13x27 / 11x23 / 10x20 | 24x31 / 21x27 / 18x23, 4/4/3 px over | 16: 26x25, 1 px top/bottom |
 
-alacritty (0.17, no `symbol_map`; fonts come from fontconfig fallback):
-- With a stock fontconfig it never uses WC3 Icons for U+1F7E0.. / U+1FA70..: it shows other fonts' glyphs
-  (Noto Sans Symbols 2 / Font Awesome outlines, Noto/Apple Color Emoji when installed, tofu). With the emoji
-  fonts hidden it uses ours only for some codepoints. Forcing it works with a fontconfig rule that appends the
-  icon font to the terminal font's family list: `<match target="pattern"><test name="family"><string>YOUR TERMINAL FONT
-  </string></test><edit name="family" mode="append" binding="same"><string>WC3 Icons</string></edit></match>`
-  (all 13 tested codepoints then used it). Such a rule also makes WC3 Icons answer for U+1F7E0..U+1F7E6.
-- It draws the colour bitmap at fixed 24/96-ish scale (0.241): 27 x 35 px at font.size 18, NOT fitted to the
-  cell; natural cell 15x29 at 100 % line height, so a 35 px icon overflows ~6 px upwards over the previous line
-  (bottom aligned). `font.offset.y = 6` gives a 35 px line pitch and a seamless column of icons; icon width 27
-  of a 30 px box (3 px right margin). Undistorted. CSI 16t is not answered (cell size from pixel pitch).
+Custom builds for one exact cell (alacritty/foot: S = cell height * 96 / font_px, W = 2 * cell width * 96 /
+font_px, BY = baseline-from-top * 96 / font_px; kitty: S/W as for the default; ghostty: only ASPECT = 2*cw/ch
+of the natural cell): name them `WC3 Icons Custom`, save as `~/.local/share/fonts/wc3-icons-custom.ttf`
+(install.sh tags and uninstalls that family/file), run `fc-cache -f ~/.local/share/fonts`. Verified example,
+alacritty Paper Mono 18 with `font.offset.y = -2` (15x27 cells): `FAMILY="WC3 Icons Custom" ASPECT=1.1111
+BY=84 python3 build.py wc3-icons-custom.ttf 1212 4 108` -> 30x27, exact (also stacked, no overlap).
 
-ghostty (1.3.1, GTK):
-- Ignores the fontconfig fallback for emoji codepoints: always draws the system emoji font (here Noto/Apple
-  Color Emoji), also with the rule above. It works with `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons`
-  (add `U+1F7E0-U+1F7E6=WC3 Icons` only if you want the race fallbacks too): colour bitmap drawn, undistorted, scaled by the font's NATURAL cell (not the
-  adjusted one) and centred: 22 x 29 px at natural 15x29 (exact height fit, 4 px side gaps), 23 x 29 in
-  14x36 cells (adjust-cell-height; 3-4 px gap top/bottom), 11 x 14 in 8x16, 15 x 18 in 10x22, 29 x 39 in
-  18x40 (fills); in a narrow/tall 9x30 cell it overflows the 2-cell box horizontally (about 4 px each side; the
-  vertical extent there was not measured cleanly). So in ghostty the icons are not full height unless the line height is left at 100 %.
-
-Not installed here, so not tested and not claimed: wezterm, foot, konsole, gnome-terminal, xterm, st,
-terminator, tilix, rio, contour, Terminal.app/iTerm2 (CoreText has no CBDT anyway, see Install). Mitigations:
-`fontconfig/install.sh` generates the rules for the character codepoints (weak family append for alacritty-style
-terminals is NOT part of them, it would also take over the circle emoji; add your own rule as shown above);
-ghostty needs the `font-codepoint-map` line; for terminals that cannot draw CBDT the plugin shows a tofu or
-another emoji font's glyph instead of the icon, so `race_font false` (initials badges) is the fallback.
+Rule of thumb: kitty with a tall line height -> `WC3 Icons`; ghostty -> `WC3 Icons Wide` (any size);
+foot/alacritty -> the variant whose height (1.5 x font px for `WC3 Icons`, 1.21 x font px for Wide) equals
+the cell height, else a custom build. Untested: wezterm, konsole, gnome-terminal, xterm, st, rio, contour;
+macOS (CoreText has no CBDT, see Install). A terminal that cannot draw CBDT shows another emoji or a box:
+`race_font false` (initials badges).
 
 Limits of the CBDT small metrics: height/width <= 255 and BY <= 127 as bytes. When testing, give test builds a
 different `FAMILY` (an installed font with the same family silently wins; use a private FONTCONFIG_FILE and

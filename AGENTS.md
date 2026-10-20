@@ -80,18 +80,17 @@ written blind.
   options go in the layout's plugin block. Shipped layout loads
   `file:~/.claude/plugins/marketplaces/zellij-wc3cz/claude-tabs.wasm` (verified in an isolated session).
 - `fontconfig/install.sh` (Linux/BSD; macOS/others print "not supported, initials badges", exit 0): copies
-  the font to `${XDG_DATA_HOME:-~/.local/share}/fonts/wc3-icons.ttf` (never overwrites a foreign
-  `wc3-icons.ttf`), writes `${XDG_CONFIG_HOME:-~/.config}/fontconfig/conf.d/60-wc3-icons.conf` GENERATED
-  from the installed font's charset (repo copy = `install.sh --print-conf`; regenerate after font
-  changes: `sh fontconfig/install.sh --print-conf > fontconfig/60-wc3-icons.conf`), fc-cache, prints proof.
-  Refuses to overwrite a conf without its marker; `--uninstall`, `--check`. Rules apply ONLY to the
-  character icon codepoints (circle emoji etc. untouched): (1) `emoji` alias prefers WC3 Icons (kitty looks
-  up emoji-presentation chars as family "emoji"+color, then takes the first candidate covering the char);
-  (2) weak append to every pattern (never beats a requested family; a strong append hijacked
-  `fc-match monospace`); (3) per-codepoint `charset contains` -> prepend_first. Verified in a sandbox with
-  `fc-match` and kitty's own matcher (headless); NOT verified: rendering in real kitty/alacritty/foot
-  windows by this route. Side effect: `fc-match emoji` without a charset answers WC3 Icons. The `font`
-  flag only says the font is installed, not that the terminal draws it.
+  `wc3-icons.ttf` and `wc3-icons-wide.ttf` to `${XDG_DATA_HOME:-~/.local/share}/fonts/` (never overwrites a
+  foreign file of that name), writes `${XDG_CONFIG_HOME:-~/.config}/fontconfig/conf.d/60-wc3-icons.conf`
+  GENERATED from the font's charset (repo copy = `install.sh --print-conf`; regenerate after font changes:
+  `sh fontconfig/install.sh --print-conf > fontconfig/60-wc3-icons.conf`), `fc-cache -f` on the font dir,
+  prints `--check` and per-terminal config lines. Refuses to overwrite a conf without its marker;
+  `--uninstall` (also removes a `WC3 Icons Custom` build at `fonts/wc3-icons-custom.ttf`), `--check`. Rules:
+  (1) per character codepoint `charset contains` -> prepend_first `WC3 Icons` (race circles U+1F7E0.. untouched);
+  (2) scan rules giving the families `WC3 Icons`, `WC3 Icons Wide`, `WC3 Icons Custom` lang `und-zsye`
+  (fcft/foot takes emoji-presentation codepoints only from fallbacks with that lang; needs fc-cache -f).
+  Checked: `fc-match emoji`, `:lang=und-zsye`, `emoji:charset=1f600` still answer Noto Color Emoji. The
+  `font` flag only says the font is installed, not that the terminal draws it.
 - Sandbox rule: tests of setup.sh / plugin install need HOME/XDG_*/CLAUDE_CONFIG_DIR in a scratch dir.
   `claude plugin validate .` should only warn about the missing version.
 
@@ -400,12 +399,20 @@ written blind.
   partial, 117 = bottom row partial). Verified at 14x36: 0 gaps, stacked lines seamless. Retune: S/PPEM so
   S*font_px/PPEM == cell height and W*font_px/PPEM <= 2*cell width (CBDT limits: height/width <= 255,
   BY <= 127). Test builds need another family name AND a private FONTCONFIG_FILE + XDG_DATA_HOME.
-- Other terminals (measured, README has the table): kitty OK (other cell sizes undistorted but smaller,
-  only 14x36 pixel exact). alacritty: no symbol_map, uses the font only if a fontconfig rule appends it, draws
-  unfitted, needs `font.offset.y`. ghostty: ignores fontconfig for emoji codepoints, needs
-  `font-codepoint-map` for the icon codepoints, scales to the natural cell. wezterm/foot/konsole/
-  gnome-terminal/xterm/st: untested. Mitigations: fontconfig rules, ghostty `font-codepoint-map`, or
-  `race_font off` (README).
+- `wc3-icons-wide.ttf` (family `WC3 Icons Wide`): `FAMILY="WC3 Icons Wide" ASPECT=1.0345 BY=92 python3 build.py
+  wc3-icons-wide.ttf 1212 4 116` (120x116; ASPECT > 1 crops top/bottom, build.py `CROP_KEEP > 1`). For cells
+  about 1:2 (ghostty any size, foot/alacritty Paper Mono 18 at 100 % line height). Rebuild both after icon changes.
+- Terminals (measured 2026-10-21 in isolated windows + pixel analysis + glyph comparison with the font PNGs;
+  tables in `assets/wc3-icons/README.md`, config lines in README Quick start): kitty needs `symbol_map`
+  (exact only at 14x36). ghostty ignores fontconfig for emoji (needs `font-codepoint-map`) and the font's
+  PPEM/BY/ascent: it fits the bitmap ASPECT into 2 cells x the font's NATURAL height, centred
+  (`adjust-cell-height` = background bands; Wide = exact at 0). foot (fcft) and alacritty scale by
+  font_px/PPEM unfitted from the baseline (foot clips, alacritty overflows upward); foot needs the font in
+  its `font=` fallback list + the und-zsye tag; alacritty needs a fontconfig family-append rule (scope it with
+  `<test name="prgname"><string>alacritty</string></test>`). Custom builds per cell: README formula.
+  Untested: wezterm/konsole/gnome-terminal/xterm/st. Test harness pitfalls: test families need unique names,
+  private FONTCONFIG_FILE + XDG_CONFIG_HOME + XDG_CACHE_HOME (scan rules need a fresh cache); foot 1.28 uses
+  `[colors-dark]` (old `[colors]` is an error); ghostty reloads on SIGUSR2, kitty on SIGUSR1, alacritty live.
 
 ## macOS (written without a Mac; unverified)
 - Done for it: claude-lib.sh (Homebrew PATH, state-root candidates, `run_timeout` timeout/gtimeout/perl,
@@ -428,8 +435,8 @@ written blind.
   without a short one plays its shortest (Hnus, shortest 3.4 s). Verified in isolated sessions with a stub player:
   `max_clip_s "3"` -> 30 dings of 10 characters, all <= 3 s except Hnus's own shortest; unset -> clips of 8 s and
   25.9 s were picked. Pit Lord has no active clip (character fully excluded, `characters.tsv` clips 0).
-- The font flag says "installed", not "this terminal draws it": alacritty/ghostty need extra terminal
-  config (README); colour icons are unverified on macOS and other terminals. Such users set `race_font off`.
+- The font flag says "installed", not "this terminal draws it": every terminal needs its config line
+  (README); colour icons are unverified on macOS and untested terminals. Such users set `race_font off`.
 - Once after a reload one finish produced two identical dings (two instances acted); not reproduced.
 - After a reload, tabs whose last Stop was `done ... sub` show the spinner for the grace period.
 - The subagent count depends on hooks/transcripts; a missed stop (other than TaskStop/kill, see above) sticks
