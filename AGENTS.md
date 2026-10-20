@@ -383,12 +383,18 @@ written blind.
 - Done: standalone git repo; Claude Code plugin + marketplace; opt-in setup.sh; fontconfig installer;
   one WC3 character per tab (icon, tint, voice) with initials fallback; attention alerts; serialised
   playback with ding.log; os-focus stale-title fix; answerable permission prompt; pkgdir path discovery;
-  re-cut sound library (nothing was listened to: checks are energy + Whisper only).
+  re-cut sound library after the owner's hand edit of the transcripts (795 active / 44 excluded, 91
+  characters with clips; long clips are allowed, Pit Lord and the villagers are fully excluded by the
+  owner); `max_clip_s` option. The owner listened to the clips flagged as uncertain and found them
+  acceptable; the rest was checked with energy + Whisper only.
 - A plugin-less config that still has old hooks in Claude settings doubles every hook once the plugin is
   installed: run `setup.sh --migrate-to-plugin`. A script that used to rely on `setup.sh` doing things by
   default now needs the explicit options.
-- Open: the Known issues above; test on a Mac and other desktops/terminals; publish and verify the
-  marketplace install from GitHub; listen to the re-cut clips and to the ones the transcript edit changed
-  (low Whisper similarity list in the workspace `work/textedit/verify.tsv`).
+- NEXT: the fresh-install test on a clean second machine: follow `FRESH_INSTALL_TEST.md` (preconditions,
+  procedure, what to produce, rules). Append the results to this file and fix the README for every
+  deviation found.
+- Open: the Known issues above; test on a Mac and other desktops/terminals; the marketplace install from
+  GitHub (the repo is public) has never been run end to end; Bluetooth wake-up clipping of the first ms
+  of a voice line is an untested hypothesis (try `lead_in_ms`).
 - Resume: `sh setup.sh` (status), `./dev.sh -s <isolated session>` (build + reload), `claude plugin
   validate .`; rebuild and commit the wasm after every source change.
