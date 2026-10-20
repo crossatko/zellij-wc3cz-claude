@@ -228,7 +228,9 @@ code).
 | Option | Default | Meaning |
 |--------|---------|---------|
 | `package_dir` | (empty) = found automatically | the package dir (scripts + `sounds/`). Empty: the dir `claude-hook.sh` runs from, which it reports to the plugin on every event (`<zellij tmp>/zellij-claude/pkgdir`; works from the Claude Code plugin cache, a checkout or a link); before the first hook event `~/.config/zellij/plugins/claude-tabs`. Set it only to force another location |
-| `ding_command` | `play-phrase.sh --ding` | fallback sound when no voice line can be played |
+| `ding_command` | `play-phrase.sh --ding` | fallback sound when there is no voice line to play (empty library, no player); a player that fails after starting does not trigger it |
+| `lead_in_ms` | `0` | play this much silence (0-3000) with the same player right before each clip, so a sleeping or Bluetooth speaker wakes on the silence instead of eating the start of the speech; adds the value plus about 0.15 s to every ding. Try `300` if clips start cut off |
+| `dup_window_ms` | `2000` | a ding for the same character that follows another within this time is dropped (finish + question of one tab, two panes) |
 | `ding_when_focused` | `false` | also ding when the finished tab is the active one |
 | `ding_when_os_unfocused` | `true` | ding and blink the ACTIVE tab too when the terminal window was not the OS-focused window at the finish (see "Away from the terminal") |
 | `ding_with_subagents` | `false` | ding on every Stop, even while subagents run |
@@ -297,6 +299,11 @@ Arch: `sudo pacman -S rust rust-wasm`. `target/` is git-ignored.
 
 ## Troubleshooting
 
+- **Extra, doubled or cut-off speech**: one clip plays at a time (a ding for another tab waits for the
+  running clip, at most 15 s, one waiting; same-character repeats within `dup_window_ms` are dropped).
+  `/tmp/zellij-$(id -u)/zellij-claude/ding.log` has one line per attempt (trigger, tab, clip,
+  played / failed / dropped-*). A clip whose start is cut off on a Bluetooth speaker: set `lead_in_ms 300`
+  (or 500) and restart the session; judge by ear.
 - **Never hear a ding**: by default no ding for the ACTIVE tab while its window has the OS focus
   (`ding_when_focused`; `os-focus.sh SESSION` shows what the helper sees) and none while subagents run. `claude-ctl.sh ding "Thrall"` must play a clip; if not, check the player
   (`pw-play <pkg>/sounds/ding.wav`). `claude` sessions started before the hooks were added

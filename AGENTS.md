@@ -228,6 +228,24 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   `ding [character]` / `reshuffle`; pipe names `claude_character`, `claude_race`, `claude_ding`.
   play-phrase.sh matches files `"<Character> - "*` (awk index on ENVIRON, no globbing) in all race folders;
   character without clips = any clip; nothing = exit 3 -> ding.
+- Playback (2026-10-20, play-phrase.sh; verified in an isolated session with a stub player and on a null sink):
+  every ding goes through one mkdir mutex `<root>/play.lock` (stale = dead owner pid or 5 s) so the picker's
+  read-pick-write of `last-<char>` is atomic. `<root>/playing` = `<script pid> <comm> <start ms> <char>`
+  (trusted only while the pid lives with that comm and < 2 min old; the script no longer execs the player,
+  it waits for it). Policy: same character within `dup_window_ms` (2000) of the previous start = dropped
+  (Stop + attention, two panes of one tab); a ding while a clip plays WAITS for it (queue of one in
+  `<root>/queued`, at most 15 s, `CLAUDE_TABS_QUEUE_MAX_S`), a further one is dropped; nothing is ever
+  killed. Exit 0 = played or dropped, 3 = nothing to play / no player / command not found, else the player's
+  status. `ding()` in main.rs runs `ding_command` / packaged ding.wav ONLY on exit 3 (a transient player
+  failure no longer adds a second sound). One line per attempt in `<root>/ding.log` (trigger finish|attention|
+  ctl, who session/pane, char, clip, outcome played|failed|dropped-duplicate|dropped-queue-full|dropped-timeout|
+  dropped-busy, queued_ms, lead_in_ms; rotated at 100 KB to ding.log.1). `ding_command` runs are not logged.
+- Lead-in (`lead_in_ms`, default 0): a generated silent WAV (`<root>/silence-<ms>.wav`, printf header +
+  /dev/zero) is played by the same player right before the clip, so a sleeping/Bluetooth sink wakes on the
+  silence. Chosen over ffmpeg/sox concat (extra dependency, decode cost) and a held-open stream (no portable
+  way). Null sink (pw-play): clip bit-exact (corr 1.0, no trimmed start/end), onset delayed by lead_in plus
+  about 100-170 ms for the second process start. NOT verified: whether it cures real Bluetooth wake-up cut-offs
+  (cannot be measured here); the sink must stay awake across the gap (PipeWire's idle suspend is about 5 s).
   Without the colour font (`race_font` off/auto with font flag 0) a tab shows a 2-cell INITIALS badge instead of
   the glyph (`badge_candidates`/`badge_table` in main.rs, `badge_colors` in tab.rs): first letters of words 1+2
   (single word: letters 1+2), words reduced to width-1 letters (so `-`, `(`, `'` vanish), uppercase
@@ -371,6 +389,8 @@ Claude tab (icon + tint from its race colour, 92 characters), a Czech WC3 voice 
   with differing TMPDIR. Checklist: README "macOS checklist".
 
 ## Known issues / caveats
+- Playback overlap was fixed on 2026-10-20 (see "Playback"), but the owner's "cut-off start" reports on a
+  Bluetooth headset are unproven: try `lead_in_ms 300` and read `ding.log`.
 - FIXED (2026-10-20) delayed ding (played only after switching tabs): `task_running` (transcript agent scan
   from `claude-agents.sh`) is per instance and only the instance of the FOCUSED tab polled it, so the
   leader in an inactive tab kept a stale non-empty list, `read_files` counted it as running subagents and
