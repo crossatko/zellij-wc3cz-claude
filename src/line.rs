@@ -1,6 +1,7 @@
 use ansi_term::ANSIStrings;
 use unicode_width::UnicodeWidthStr;
 
+use crate::tab::tint_colors;
 use crate::{LinePart, TabRenderData, ARROW_SEPARATOR};
 use zellij_tile::prelude::*;
 use zellij_tile_utils::style;
@@ -15,6 +16,7 @@ pub fn tab_line(
     tab_data: TabRenderData,
     cols: usize,
     clock: Option<String>,
+    clock_char: Option<(String, Option<(u8, u8, u8)>)>,
 ) -> TabLineOutput {
     let dimmed = mode_info.session_ascended == Some(true) || mode_info.session_dimmed == Some(true);
     let breadcrumb_ancestry = if mode_info.host_fullscreen == Some(true) {
@@ -33,6 +35,7 @@ pub fn tab_line(
         breadcrumb_ancestry,
         nested_hint,
         clock,
+        clock_char,
     };
 
     let builder = TabLineBuilder::new(config, mode_info.style.colors, mode_info.capabilities, cols);
@@ -73,6 +76,30 @@ pub struct TabLineConfig {
     pub breadcrumb_ancestry: Vec<String>,
     pub nested_hint: NestedSessionHint,
     pub clock: Option<String>,
+    pub clock_char: Option<(String, Option<(u8, u8, u8)>)>, // active tab's character + accent, left of the clock
+}
+
+// `s` cut to at most `max` display cells with a trailing ellipsis; None when fewer than 4 cells would be
+// left for it (not worth showing)
+fn truncate_cells(s: &str, max: usize) -> Option<String> {
+    use unicode_width::UnicodeWidthChar;
+    if s.width() <= max {
+        return Some(s.to_string());
+    }
+    if max < 4 {
+        return None;
+    }
+    let mut out = String::new();
+    let mut w = 0;
+    for c in s.chars() {
+        let cw = c.width().unwrap_or(0);
+        if w + cw > max - 1 {
+            break;
+        }
+        out.push(c);
+        w += cw;
+    }
+    Some(format!("{}…", out.trim_end()))
 }
 
 fn calculate_total_length(parts: &[LinePart]) -> usize {
@@ -539,6 +566,25 @@ impl RightSideElementsBuilder {
             let len = text.width();
             if len + swap_len <= available_space {
                 let colors = &self.palette.text_unselected;
+                // the character name sits left of the clock: truncated with an ellipsis, dropped before the clock
+                if let Some((name, accent)) = config.clock_char.as_ref() {
+                    let room = (available_space - len - swap_len).saturating_sub(2);
+                    if let Some(shown) = truncate_cells(name, room) {
+                        let text = format!(" {} ", shown);
+                        let len = text.width();
+                        // text in the active tab's colour (tab.rs render_tab: the tinted accent, else the
+                        // ribbon_selected background) on the clock's background
+                        let st = if self.dimmed {
+                            style!(colors.base, colors.background).italic()
+                        } else if let Some(acc) = accent {
+                            let (tab_bg, _) = tint_colors(*acc, true, 0.0);
+                            style!(PaletteColor::Rgb(tab_bg), colors.background).bold()
+                        } else {
+                            style!(self.palette.ribbon_selected.background, colors.background).bold()
+                        };
+                        elements.push(LinePart { part: st.paint(text).to_string(), len, tab_index: None });
+                    }
+                }
                 let st = if self.dimmed {
                     style!(colors.base, colors.background).italic()
                 } else {

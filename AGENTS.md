@@ -504,3 +504,22 @@ Claude config dir (`CLAUDE_CONFIG_DIR`).
   finish (unexplained); the two-tab real-payload permission/AskUserQuestion attention flow on this machine;
   edge checks (narrow terminal, HOME with spaces, `setup.sh` with no flags, `dev.sh` refusing foreign
   sessions); uninstall (deliberately skipped, the owner keeps the install).
+
+## Character name next to the clock
+
+- What: option `clock_character` (default `true`, needs `clock`). The active tab's character (`tab_chars`) is
+  drawn as ` Name ` immediately left of the clock, TEXT in the active tab's colour on the clock's background
+  (`text_unselected.background`), bold: with `race_tab_colors` + `race_icons` the tab background from
+  `tint_colors(char_style accent, active=true)` (accent lightened 15%), else `ribbon_selected.background`;
+  dimmed sessions: plain clock colours, italic. Blink/bell looks are ignored. Contrast of the accent against the
+  bar background is not enforced. The clock keeps `text_unselected`. `State::clock_char_text` (main.rs) -> `line::tab_line(.., clock_char)` -> `RightSideElementsBuilder::build`
+  (line.rs). Name is cut to the free cells with an ellipsis (`truncate_cells`, display-cell width, so diacritics
+  are fine) and dropped when fewer than 4 cells remain; the clock itself still goes first-after-name only when
+  clock + swap indicator do not fit (name never keeps the clock out). No render_key change needed (it already
+  contains `tab_chars` and the clock text).
+- Verified: `cargo build --release --target wasm32-wasip1` clean, `cargo test` 15 passed.
+- NOT verified: no visual check (user declined screenshots, they would show tab names) (needs a tab with an assigned character, i.e. a Claude pane with hook state;
+  not done in an isolated session). The wasm in the repo root is not rebuilt/copied (`./dev.sh -s <isolated
+  session>` does it).
+- Caveats: the name is not re-measured when the
+  character changes without another render trigger (any tab change re-renders).

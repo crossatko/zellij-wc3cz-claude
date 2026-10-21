@@ -442,6 +442,7 @@ struct State {
     // last "done" timestamp we reacted to (ding/auto switch) and last one shown as seen
     reacted: HashMap<u32, u128>,
     clock: bool,
+    clock_character: bool, // show the active tab's character left of the clock
     tab_chars: HashMap<usize, String>, // tab id -> character (files in characters/)
     races_opt: Vec<String>,  // `races` option: only characters of these races
     chars_opt: Vec<String>,  // `characters` option: fixed character pool
@@ -1517,6 +1518,7 @@ impl ZellijPlugin for State {
         // (permission_ok); a synchronous host call (get_session_list etc.) panics the plugin while denied
         self.perms = false;
         self.clock = truthy(cfg.get("clock"), true);
+        self.clock_character = truthy(cfg.get("clock_character"), true);
         self.race_icons = truthy(cfg.get("race_icons"), true);
         self.race_tab_colors = truthy(cfg.get("race_tab_colors"), true);
         self.show_other_clients = truthy(cfg.get("show_other_clients"), false);
@@ -1906,6 +1908,18 @@ impl State {
         run_command(&["date", "+%z"], ctx);
     }
 
+    // character of the active tab, only while the clock is shown
+    fn clock_char_text(&self) -> Option<(String, Option<(u8, u8, u8)>)> {
+        if !self.clock || !self.clock_character || self.clock_text().is_none() {
+            return None;
+        }
+        let t = self.tabs.iter().find(|t| t.active)?;
+        let name = self.tab_chars.get(&t.tab_id)?;
+        // same accent the tab itself is tinted with (tab.rs tint_colors turns it into the active look)
+        let accent = if self.race_tab_colors && self.race_icons { Some(self.char_style(name, false, false).1) } else { None };
+        Some((name.clone(), accent))
+    }
+
     fn clock_text(&self) -> Option<String> {
         if !self.clock {
             return None;
@@ -2050,7 +2064,7 @@ impl State {
             return;
         }
         let data = self.prepare_tab_data();
-        let out = line::tab_line(&self.mode_info, data, cols, self.clock_text());
+        let out = line::tab_line(&self.mode_info, data, cols, self.clock_text(), self.clock_char_text());
         self.tab_line = out.parts;
         self.breadcrumb_range = out.breadcrumb_range;
         let text: String = self.tab_line.iter().map(|p| p.part.as_str()).collect();
