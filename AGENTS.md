@@ -523,3 +523,13 @@ Claude config dir (`CLAUDE_CONFIG_DIR`).
   session>` does it).
 - Caveats: the name is not re-measured when the
   character changes without another render trigger (any tab change re-renders).
+- Bug "old tab's character stays next to the clock after closing a tab / names mismatched for seconds"
+  (clock_character). `tab_chars` is fine (keyed by stable `tab_id`, re-read from `characters/` on every
+  `refresh()`); the name uses the same `tabs` data as the tab highlights. Causes found in code (NOT reproduced
+  live, no unit test: `State` is not constructible in tests): (1) `render_key` did not contain the active tab,
+  so when `tabs` got corrected from the timer path (snapshot replacing stale tabs of an instance that got no
+  events while hidden) the key stayed equal and nothing redrew until another key part (clock minute, a name)
+  changed; (2) such a just-focused non-leader instance re-fetched the snapshot only every 30 s
+  (`leader_tick`). Fix: `render_key` starts with `A<active tab_id>`; `leader_tick` interval is 2 s for the
+  drawn instance (`last_render` < 3 s) as for the leader. To confirm: close a tab, the bar of the tab switched
+  to should show the right name within ~2 s; if it still lags, suspect the event ordering of zellij itself.

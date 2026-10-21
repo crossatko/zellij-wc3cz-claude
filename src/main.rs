@@ -926,7 +926,10 @@ impl State {
 
     // Leader duty: refresh from the server, hand out races, drop state of closed tabs / panes.
     fn leader_tick(&mut self) {
-        let interval = if self.is_leader() { 2 } else { 30 };
+        // the instance being drawn keeps its tabs fresh too: right after a tab switch / close its Tab/PaneUpdate
+        // data can be stale (it got no events while hidden) and the 30 s of a background instance is too slow
+        let drawn = now_secs().saturating_sub(self.last_render) < 3;
+        let interval = if self.is_leader() || drawn { 2 } else { 30 };
         if self.snapshot_age() < interval {
             return;
         }
@@ -2158,6 +2161,11 @@ impl State {
 
     fn render_key(&self) -> String {
         let mut s = self.clock_text().unwrap_or_default();
+        // the active tab (and with it the character next to the clock) can change without any other key part
+        // changing, e.g. when a snapshot corrects stale tabs from the timer
+        if let Some(t) = self.tabs.iter().find(|t| t.active) {
+            s.push_str(&format!("A{}", t.tab_id));
+        }
         s.push_str(if self.race_font_on() { "F1" } else { "F0" });
         if self.any_working() {
             s.push_str(&format!("S{}", self.spin_frame()));
