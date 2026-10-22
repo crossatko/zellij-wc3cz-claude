@@ -507,6 +507,7 @@ struct State {
     primed: bool,
     cwd_names: HashMap<usize, String>,        // tab position -> basename of its main pane's cwd
     cwd_pending: HashMap<usize, (String, u64)>,
+    cwd_paths: HashMap<usize, String>,        // tab position -> latest cwd of its main pane (applied when the ssh lookup answers)
     user_names: HashMap<usize, String>, // tab id -> name the user gave (files in names/)
     last_names: HashMap<usize, String>,
     last_render: u64,
@@ -1259,21 +1260,51 @@ impl State {
             return;
         }
         // get_pane_cwd is zellij's own (portable: Linux /proc, macOS libproc) lookup of the pane's ROOT
-        // process; it does not follow children, unlike zellij's tab auto-naming
+        // process; it does not follow children, unlike zellij's tab auto-naming. An ssh session is a child
+        // of that root, so one `ps` per poll looks for it; the label is applied when that answers.
+        self.cwd_paths.clear();
+        let mut roots = Vec::new();
         for (pos, id) in self.main_panes() {
             if let Ok(path) = get_pane_cwd(PaneId::Terminal(id)) {
-                self.observe_cwd(pos, &path.to_string_lossy());
+                self.cwd_paths.insert(pos, path.to_string_lossy().to_string());
+                if let Ok(pid) = get_pane_pid(PaneId::Terminal(id)) {
+                    roots.push(format!("{}:{}", pos, pid));
+                }
             }
         }
+        if roots.is_empty() {
+            self.apply_labels(&HashMap::new());
+            return;
+        }
+        let ctx = BTreeMap::from([("k".to_string(), "ssh".to_string()), ("roots".to_string(), roots.join(","))]);
+        // args cut to 300 columns: the table has every process on the machine
+        run_command(&["sh", "-c", "ps -Aww -o pid=,ppid=,args= | cut -c1-300"], ctx);
+    }
+
+    // Label of each tab's main pane: `SSH: host` while an ssh runs in it, else the folder. Both go through
+    // the same debounce, so starting or ending ssh does not flicker.
+    fn apply_labels(&mut self, ssh: &HashMap<usize, String>) -> bool {
+        let mut changed = false;
+        for (pos, path) in self.cwd_paths.clone() {
+            changed |= match ssh.get(&pos) {
+                Some(h) => self.observe_name(pos, format!("SSH: {}", h)),
+                None => self.observe_cwd(pos, &path),
+            };
+        }
+        changed
     }
 
     // Debounce: a new folder name is shown only after it has been seen for 2 s in a row.
     fn observe_cwd(&mut self, pos: usize, path: &str) -> bool {
-        let before = self.cwd_names.get(&pos).cloned();
         let name = std::path::Path::new(path.trim())
             .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| "/".to_string());
+        self.observe_name(pos, name)
+    }
+
+    fn observe_name(&mut self, pos: usize, name: String) -> bool {
+        let before = self.cwd_names.get(&pos).cloned();
         let now = now_secs();
         if self.cwd_names.get(&pos) == Some(&name) {
             self.cwd_pending.remove(&pos);
@@ -1746,6 +1777,19 @@ impl ZellijPlugin for State {
                             }
                         }
                     }
+                    Some("ssh") => {
+                        // ps failed -> no ssh known, folder names carry on
+                        let ssh = if code == Some(0) {
+                            let roots: Vec<(usize, i32)> = ctx
+                                .get("roots")
+                                .map(|r| r.split(',').filter_map(|e| e.split_once(':')).filter_map(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?))).collect())
+                                .unwrap_or_default();
+                            find_ssh_hosts(&String::from_utf8_lossy(&out), &roots)
+                        } else {
+                            HashMap::new()
+                        };
+                        redraw = self.apply_labels(&ssh);
+                    }
                     Some("osfocus") => {
                         // anything but a clear "unfocused" (focused, unknown, failure) counts as back
                         if String::from_utf8_lossy(&out).trim() != "unfocused" {
@@ -2190,10 +2234,122 @@ impl State {
     }
 }
 
+// Destination host of an `ssh ...` command line (args as one string): skips options and their
+// arguments, drops `user@`, `ssh://` and `:port`. Shown as written (alias or name), never resolved.
+fn ssh_host(args: &str) -> Option<String> {
+    let mut it = args.split_whitespace();
+    let prog = it.next()?;
+    if prog.rsplit('/').next() != Some("ssh") {
+        return None;
+    }
+    // OpenSSH options that take an argument
+    const WITH_ARG: &str = "BbcDEeFIiJLlmOopQRSWw";
+    let mut dest = None;
+    while let Some(a) = it.next() {
+        if a == "--" {
+            dest = it.next();
+            break;
+        }
+        if let Some(cl) = a.strip_prefix('-').filter(|c| !c.is_empty()) {
+            for (i, c) in cl.char_indices() {
+                if WITH_ARG.contains(c) {
+                    if cl[i + 1..].is_empty() {
+                        it.next(); // the argument is the next word
+                    }
+                    break;
+                }
+            }
+            continue;
+        }
+        dest = Some(a);
+        break;
+    }
+    let d = dest?;
+    let d = d.strip_prefix("ssh://").unwrap_or(d);
+    let d = d.split('/').next().unwrap_or(d);
+    let d = d.rsplit('@').next().unwrap_or(d);
+    let d = if let Some(v6) = d.strip_prefix('[') {
+        v6.split(']').next().unwrap_or(v6)
+    } else if d.matches(':').count() == 1 {
+        d.split(':').next().unwrap_or(d)
+    } else {
+        d
+    };
+    if d.is_empty() {
+        None
+    } else {
+        Some(d.to_string())
+    }
+}
+
+// From the `ps -Aww -o pid=,ppid=,args=` table: for each (tab position, pane root pid) the host of the
+// ssh among its descendants (the pane process itself counts). An ssh below another ssh (ProxyJump's
+// `ssh -W`) is ignored; with several, the newest (highest pid) wins.
+fn find_ssh_hosts(table: &str, roots: &[(usize, i32)]) -> HashMap<usize, String> {
+    let mut args: HashMap<i32, &str> = HashMap::new();
+    let mut kids: HashMap<i32, Vec<i32>> = HashMap::new();
+    for l in table.lines() {
+        let l = l.trim_start();
+        let Some((pid, rest)) = l.split_once(char::is_whitespace) else { continue };
+        let rest = rest.trim_start();
+        let Some((ppid, cmd)) = rest.split_once(char::is_whitespace) else { continue };
+        if let (Ok(pid), Ok(ppid)) = (pid.parse::<i32>(), ppid.parse::<i32>()) {
+            args.insert(pid, cmd.trim());
+            kids.entry(ppid).or_default().push(pid);
+        }
+    }
+    let mut out = HashMap::new();
+    for (pos, root) in roots {
+        let mut found: Vec<(i32, String)> = Vec::new();
+        let mut stack = vec![*root];
+        let mut seen = HashSet::new();
+        while let Some(p) = stack.pop() {
+            if !seen.insert(p) {
+                continue;
+            }
+            if let Some(h) = args.get(&p).and_then(|a| ssh_host(a)) {
+                found.push((p, h));
+                continue;
+            }
+            stack.extend(kids.get(&p).into_iter().flatten().copied());
+        }
+        if let Some((_, h)) = found.into_iter().max_by_key(|(p, _)| *p) {
+            out.insert(*pos, h);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use unicode_width::UnicodeWidthStr;
+
+    #[test]
+    fn ssh_hosts_from_argv() {
+        let h = |a: &str| ssh_host(a);
+        assert_eq!(h("ssh host.example"), Some("host.example".into()));
+        assert_eq!(h("/usr/bin/ssh -p 22 -i key user@host.example"), Some("host.example".into()));
+        assert_eq!(h("ssh -J jump.example host.example uptime"), Some("host.example".into()));
+        assert_eq!(h("ssh -vvv -p2222 -o StrictHostKeyChecking=no -lroot box"), Some("box".into()));
+        assert_eq!(h("ssh -Nf -L 8080:localhost:80 me@host.example"), Some("host.example".into()));
+        assert_eq!(h("ssh -- host.example"), Some("host.example".into()));
+        assert_eq!(h("ssh ssh://me@host.example:2222"), Some("host.example".into()));
+        assert_eq!(h("ssh -6 [2001:db8::1]"), Some("2001:db8::1".into()));
+        assert_eq!(h("ssh -V"), None);
+        assert_eq!(h("ssh-agent -l"), None);
+        assert_eq!(h("sshd -D"), None);
+    }
+
+    #[test]
+    fn ssh_found_among_descendants() {
+        let t = "  1 0 init\n 10 1 -zsh\n 11 10 ssh -J jump.example host.example\n 12 11 ssh -W host.example:22 jump.example\n\
+                 20 1 -zsh\n 21 20 vim x\n 30 1 ssh other.example\n";
+        let m = find_ssh_hosts(t, &[(0, 10), (1, 20), (2, 30)]);
+        assert_eq!(m.get(&0).map(|s| s.as_str()), Some("host.example"));
+        assert_eq!(m.get(&1), None);
+        assert_eq!(m.get(&2).map(|s| s.as_str()), Some("other.example"));
+    }
 
     // deterministic xorshift for the simulations
     fn sim_rng(seed: u64) -> impl FnMut() -> f64 {

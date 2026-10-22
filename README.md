@@ -15,7 +15,7 @@ zellij 0.45.1) with extras for running Claude Code agents in tabs:
 - **Ding**: when an agent finishes (and no subagents are still running), a random Czech WC3 voice
   line of THAT character plays (`sounds/wc3/`), falling back to `sounds/ding.wav`.
 - Optional **auto-switch** to the finished tab, a **clock**, tab labels from the **folder** of the
-  tab's main pane (your own tab names win), optional tab numbers.
+  tab's main pane (`SSH: host` while an ssh session runs there; your own tab names win), optional tab numbers.
 
 ## Layout
 
@@ -302,7 +302,7 @@ strings or bare true/false (`true/1/yes/on`, `false/0/no/off`); they are read wh
 | `subagent_stale_s` | `900` | ignore subagent markers older than this (missed SubagentStop; an agent stopped with TaskStop or killed is cleared at once / at the next Stop) |
 | `working_hold_s` | `20` | any hook event keeps the working look this long |
 | `auto_switch` | `false` | switch to a tab whose agent finished |
-| `auto_name` | `true` | label tabs with the folder of their main pane (user-chosen names win) |
+| `auto_name` | `true` | label tabs with the folder of their main pane, or `SSH: host` while an ssh session runs there (user-chosen names win) |
 | `title_fallback` | `true` | detect Claude panes by command/title when there is no hook state |
 | `tab_numbers` | `false` | prefix tab labels with their number |
 | `clock` | `true` | `HH:MM` on the right |

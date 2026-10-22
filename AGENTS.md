@@ -284,6 +284,18 @@ written blind.
   (`<root>/silence-<ms>.wav`) played right before the clip to wake a sleeping sink. Null sink: clip
   bit-exact, onset delayed by lead_in + ~100-170 ms. Bluetooth wake-up clipping the first ms is only a
   HYPOTHESIS: test with `lead_in_ms 300` and `ding.log`.
+- Tab label `SSH: <host>`: while an `ssh` runs in a tab's main pane the label is that instead of the folder.
+  Detection (each 2 s poll, drawn instance only): `get_pane_pid` of the main pane + ONE
+  `sh -c "ps -Aww -o pid=,ppid=,args= | cut -c1-300"` (portable Linux/macOS; ctx k=`ssh`); `find_ssh_hosts`
+  walks the pane's descendants (the pane process itself counts), takes the newest ssh not below another ssh
+  (ProxyJump's `ssh -W` child is ignored), `ssh_host` parses argv (skips options and their arguments,
+  strips `user@`, `ssh://`, `:port`; host as written, no DNS). Folder and ssh labels go through the same
+  `observe_name` debounce (2 s), applied when the ps answer arrives (`apply_labels`); user-typed names still
+  win; ps failure = folder. Unit tests `ssh_hosts_from_argv`, `ssh_found_among_descendants`. Verified live in
+  an isolated session (a symlink `ssh` -> `sleep` in PATH, label `SSH: 300`, back to the folder after ^C).
+  Caveats: args are split on whitespace (quoted args with spaces mis-parse); ssh run by a tool inside a
+  Claude tab (child of claude) also shows; mosh/et not handled; a live reload needs a connected client
+  (`No connected clients, cannot reload plugin` otherwise), so attach one (pty) when testing headless.
 - Tab labels: folder of the pane's ROOT process (`get_pane_cwd`, 2 s debounce); zellij's own auto-names
   follow the FOREGROUND process (a Bash `cd /tmp && ...` renamed tabs), so they are ignored with `auto_name`.
   User names (changed during/within 3 s of interactive RenameTab) stick, stored in `names/`;
