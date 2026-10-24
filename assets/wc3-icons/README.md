@@ -207,7 +207,24 @@ anything outside the canvas is cropped. So:
    | 18 / 0 | 0 (ASPECT 1.0) | 1 | ~0.5 | ~0.5 | 42 x 42 |
 
    For another setting pick `SBIX_DX` so `round(SBIX_DX x px/1000)` = wanted gap - `round(x)`, mid-interval
-   (e.g. 2.0 px at 42 px = 48), and check with a screenshot.
+   (e.g. 2.0 px at 42 px = 48), and check with a screenshot; the formula is only a guide (it predicted 1 px where
+   14 pt measured 3).
+
+   No single build fits every setting: the left gap depends only on the font size (measured: identical for every
+   `adjust-cell-height`), the top/bottom bands only on `adjust-cell-height` (N/2 each, negative N draws over the
+   neighbouring rows, odd N is uneven), and CoreText ignores GPOS Device tables (per-ppem deltas at ppem 18 and 36
+   changed nothing), so a font gets at most one matching N per size. Shipped `SBIX_DX = 48`, left/top/bottom in
+   px, font-size x `adjust-cell-height`; "ok" = left equals top and bottom (or all 0):
+
+   | size | left | -2 | 0 | 2 | 4 | 6 |
+   |---|---|---|---|---|---|---|
+   | 12 | 2 | -1/-1 | 0/0 | 1/1 | 2/2 ok | 3/3 |
+   | 14 | 3 | -1/-1 | 0/0 | 1/1 | 2/2 | 3/3 ok |
+   | 16 | 2 | -1/-1 | 0/0 | 1/1 | 2/2 ok | 3/3 |
+   | 18 | 3 | -1/-1 | 0/0 | 1/1 | 2/2 | 3/3 ok |
+   | 21 | 2 | -1/-1 | 0/0 | 1/1 | 2/2 ok | 3/3 |
+   | 24 | 4 | 0/-1 | 1/0 | 2/1 | 3/2 | 4/3 |
+   | 28 | 4 | -1/-1 | 0/0 | 1/1 | 2/2 | 3/3 |
 5. The family is named exactly like the Linux font ("WC3 Icons Wide"), because `font-codepoint-map` with a family
    that does not exist is silently ignored (system emoji show) but the LAST matching map line wins even if its family
    is missing, so two lines (one per OS) cannot share a config; one name can.

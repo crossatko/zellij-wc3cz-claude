@@ -411,7 +411,8 @@ character name next to the clock. Linux verified; macOS install and icons verifi
   the shaper's GPOS x offset AFTER that, unclipped, so `SBIX_DX` (GPOS `kern` XPlacement, units/1000 of font px)
   sets the left gap. A font cannot see the size or `adjust-cell-height`, so it is tuned per setting: 48 = 2 px
   left at font-size 21 + `adjust-cell-height = 4` (2 px top/bottom too, icon 50x50; formula + table in the
-  icons README). Other settings may leave 0-1 px or overlap the previous cell by 1 px.
+  icons README). Left gap depends only on the size, the bands only on `adjust-cell-height`, CoreText ignores GPOS
+  Device tables: one static font matches at most one N per size (matrix in the icons README).
   kitty: 0 px, 44 px exact. A glyph
   without outline draws nothing; a glyph object shared between names compiles once (others empty); kitty
   shrinks icons that have the box (kitty font has none). A `font-codepoint-map` to a missing family is
