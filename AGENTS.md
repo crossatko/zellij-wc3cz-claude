@@ -380,9 +380,11 @@ character name next to the clock. Linux verified; macOS install and icons verifi
   Retune: S/PPEM so S*font_px/PPEM == cell height and W*font_px/PPEM <= 2*cell width (CBDT limits:
   height/width <= 255, BY <= 127). Test builds need another family name AND a private FONTCONFIG_FILE +
   XDG_DATA_HOME.
-- `wc3-icons-wide.ttf` (family `WC3 Icons Wide`): `FAMILY="WC3 Icons Wide" ASPECT=1.0345 BY=92 python3 build.py
-  wc3-icons-wide.ttf 1212 4 116` (120x116; ASPECT > 1 crops top/bottom, build.py `CROP_KEEP > 1`). For cells
-  about 1:2 (ghostty any size, foot/alacritty Paper Mono 18 at 100 % line height). Rebuild both after icon changes.
+- `wc3-icons-wide.ttf` (family `WC3 Icons Wide`): `FAMILY="WC3 Icons Wide" ASPECT=1.0345 BY=92 PAD_X=4 python3
+  build.py wc3-icons-wide.ttf 1212 4 116` (120x116 bitmap, icon 112x116 centred with 4 transparent strike px each
+  side = 1 px at ghostty 18, so 1 px gap on all sides there with adjust-cell-height 2; build.py `PAD_X`). For cells
+  about 1:2 (ghostty any size, foot/alacritty Paper Mono 18 at 100 % line height; there the icon is 28 px wide in a
+  30 px box). Rebuild both after icon changes.
 - Terminals (measured in isolated windows + pixel analysis; tables in `assets/wc3-icons/README.md`, config
   lines in README Quick start): kitty needs `symbol_map U+1FA70-U+1FAD6 WC3 Icons` (REQUIRED: kitty 0.49.2
   picks Noto Color Emoji otherwise despite `fc-match`; exact only at 14x36). ghostty ignores fontconfig for

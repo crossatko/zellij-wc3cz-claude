@@ -6,8 +6,8 @@ hook finds the font installed with `fc-list`, Linux only; with `race_font false`
 shows two-letter initials badges). Install it with `fontconfig/install.sh` (see Install); every terminal
 then needs one config line (kitty `symbol_map U+1FA70-U+1FAD6 WC3 Icons`, see the README Quick start table).
 
-`wc3-icons-wide.ttf` (family `WC3 Icons Wide`) has the same glyphs with a wider, shorter bitmap (120 x 116)
-for cells about half as wide as tall (ghostty, foot, alacritty at 100 % line height, see Terminals below).
+`wc3-icons-wide.ttf` (family `WC3 Icons Wide`) has the same glyphs with a wider, shorter bitmap (120 x 116, icon
+112 x 116 with 4 transparent px each side) for cells about half as wide as tall (ghostty, foot, alacritty at 100 % line height, see Terminals below).
 
 Race icons (`icons/`):
 
@@ -58,7 +58,7 @@ stay with the system emoji font, and a character without an icon glyph then show
 ```sh
 cd assets/wc3-icons
 python3 build.py        # = FAMILY="WC3 Icons" PPEM=96 BY=116 ASPECT=0.7778 python3 build.py wc3-icons.ttf 1212 4 144
-FAMILY="WC3 Icons Wide" ASPECT=1.0345 BY=92 python3 build.py wc3-icons-wide.ttf 1212 4 116
+FAMILY="WC3 Icons Wide" ASPECT=1.0345 BY=92 PAD_X=4 python3 build.py wc3-icons-wide.ttf 1212 4 116
 sh ../../fontconfig/install.sh   # installs both, then restart the terminal
 ```
 
@@ -66,7 +66,7 @@ The font is about 2.9 MB (each glyph is a ~30 KB PNG strike). Arguments: advance
 (removes the 4 px button frame, applied per icon only when `has_frame()` finds the grey frame; all 99 shipped icons
 have it), bitmap height in px (144). Env: `ASPECT` = bitmap width/height (0.7778, bitmap 112 x 144), `CROP_KEEP` = fraction of the width kept
 by the centre crop (default = `ASPECT`, so the icon is cropped to the bitmap aspect and NEVER squashed; a smaller
-value stretches, a larger one squashes; above 1 the top and bottom are cropped instead, for wide bitmaps), `PPEM` = strike size, `BY` = bearing Y, `BX` = bearing X.
+value stretches, a larger one squashes; above 1 the top and bottom are cropped instead, for wide bitmaps), `PAD_X` = transparent strike px left and right inside the W x S bitmap (icon resized to W-2*PAD_X; CROP_KEEP defaults to (W-2*PAD_X)/S, sides cropped, never squashed), `PPEM` = strike size, `BY` = bearing Y, `BX` = bearing X.
 
 Design: the bitmap is 112 x 144 strike px (aspect 0.7778, centre-cropped from the icon, never squashed) at PPEM 96.
 kitty at font_size 18 (24 px em) scales a strike by 24/96 = 0.25 -> exactly 28 x 36 px = the 2-cell box of the
@@ -112,14 +112,15 @@ How each terminal sizes a colour bitmap (verified with variants of PPEM, BY, asc
 | kitty 16, 110 % | 13x33 | 24x31, 2 px left/bottom | |
 | kitty 14, 110 % | 11x29 | 21x26 | |
 | kitty 12, 100 % | 10x22 | 16x20 | |
-| ghostty 18, adjust-cell-height 0 | 15x29 | 22x29, 4 px each side | 30x29, exact |
-| ghostty 18, adjust-cell-height 3 (or 10 %) | 15x32 | 22x29, 4 px sides, 2 px top, 1 px bottom | 30x29, 2 px top, 1 px bottom |
+| ghostty 18, adjust-cell-height 0 | 15x29 | 22x29, 4 px each side | 28x29, 1 px each side (PAD_X 4; 30x29 flush without) |
+| ghostty 18, adjust-cell-height 3 (or 10 %) | 15x32 | 22x29, 4 px sides, 2 px top, 1 px bottom | 28x29, 1 px sides, 2 px top, 1 px bottom |
+| ghostty 18, adjust-cell-height 2 (the dotfiles config) | 15x31 | | 28x29, 1 px on all four sides (was 30x29, 0 px sides) |
 | ghostty 16, adjust-cell-height 3 | 13x28 | 20x25 | |
 | ghostty 14 / 12, 0 | 11x23 / 10x19 | 18x23 / 14x19 (side gaps) | |
 | foot monospace 8 (defaults, Noto Sans Mono) | 6x16 | 12x16, exact | 13x12, 1 px over the right edge |
-| foot Paper Mono 18 | 15x29 | 28x29 visible (clipped) | 30x29, exact |
+| foot Paper Mono 18 | 15x29 | 28x29 visible (clipped) | 28x29 in the 30x29 box (PAD_X 4; 1 px each side; was exact 30x29, not re-measured) |
 | foot Paper Mono 12 | 10x20 | | 20x19, 1 px top |
-| alacritty 18, offset.y 0 | 15x29 | 28x35, 6 px over the line above | 30x29, exact |
+| alacritty 18, offset.y 0 | 15x29 | 28x35, 6 px over the line above | 28x29 in the 30x29 box (not re-measured) |
 | alacritty 18, offset.y -2 | 15x27 | 28x35, 8 px over | 30x29, 2 px over |
 | alacritty 18, offset.y 6 | 15x35 | 28x35, 2 px right gap | |
 | alacritty 16 / 14 / 12, 0 | 13x27 / 11x23 / 10x20 | 24x31 / 21x27 / 18x23, 4/4/3 px over | 16: 26x25, 1 px top/bottom |

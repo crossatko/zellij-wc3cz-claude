@@ -31,7 +31,8 @@ crop=int(a[2]) if len(a)>2 else 4
 S=int(a[3]) if len(a)>3 else 144
 ASPECT=float(os.environ.get("ASPECT","0.7778"))  # bitmap width/height; 0 = square
 W=round(S*ASPECT) if ASPECT else S
-CROP_KEEP=float(os.environ.get("CROP_KEEP") or (ASPECT or 1))  # < 1: fraction of the (frame-cropped, square) width kept (centre); > 1: the height kept is 1/CROP_KEEP; default = ASPECT, so no squash
+PAD_X=int(os.environ.get("PAD_X","0"))  # transparent strike px on the left and right inside the W x S bitmap (the icon is resized to W-2*PAD_X x S); ghostty fits the whole bitmap into the cell, so this is the side gap there
+CROP_KEEP=float(os.environ.get("CROP_KEEP") or ((W-2*PAD_X)/S if PAD_X else (ASPECT or 1)))  # < 1: fraction of the (frame-cropped, square) width kept (centre); > 1: the height kept is 1/CROP_KEEP; default = ASPECT, so no squash
 def has_frame(im):
     """True if the 64x64 icon carries the Warcraft III button frame: the two outermost px rings on all four
     sides are grey (mean max-min channel spread < 15; portraits at the edge are coloured). All 99 shipped icons
@@ -80,7 +81,9 @@ for i,path in enumerate(SRC):
         w,h=im.size; nw=round(w*CROP_KEEP); l=(w-nw)//2; im=im.crop((l,0,l+nw,h))
     elif CROP_KEEP>1:  # wider than tall (ASPECT > 1): centre crop of top and bottom instead
         w,h=im.size; nh=round(h/CROP_KEEP); t=(h-nh)//2; im=im.crop((0,t,w,t+nh))
-    im=im.resize((W,S),Image.LANCZOS)
+    if PAD_X:
+        pad=Image.new("RGBA",(W,S),(0,0,0,0)); pad.paste(im.resize((W-2*PAD_X,S),Image.LANCZOS),(PAD_X,0)); im=pad
+    else: im=im.resize((W,S),Image.LANCZOS)
     b=io.BytesIO()
     im.save(b,"PNG",optimize=True)
     bitmaps[f"wc3_{i}"]=b.getvalue()
