@@ -102,6 +102,10 @@ if os.environ.get("SBIX"):  # Apple sbix colour bitmap (macOS CoreText); same gl
     stk.glyphs[".notdef"]=SbixGlyph(glyphName=".notdef",graphicType=None,imageData=None)
     sb.strikes[ppem]=stk
     font["sbix"]=sb
+    dx=int(os.environ.get("SBIX_DX","0"))  # GPOS XPlacement (units) on every icon: ghostty adds the shaper's x offset AFTER its centred, padded emoji fit (README "ghostty on macOS")
+    if dx:
+        from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
+        addOpenTypeFeaturesFromString(font,"languagesystem DFLT dflt;\nfeature kern {\n"+"".join(f"  pos {n} <{dx} 0 0 0>;\n" for n in names[1:])+"} kern;\n")
     font.save(out); print("wrote",out,os.path.getsize(out)); sys.exit(0)
 # build CBDT / CBLC
 cbdt=newTable("CBDT"); cblc=newTable("CBLC")
