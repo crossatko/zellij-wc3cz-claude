@@ -3,7 +3,7 @@
 # (README "Quick start": install the Claude Code plugin, add the bar to a zellij layout). Without options it
 # only prints the status and what you could do; it changes NOTHING. Each change needs its own option:
 #   setup.sh                       status + instructions (dry run, writes nothing)
-#   setup.sh --font                Linux: install the WC3 icon font + fontconfig rules (fontconfig/install.sh;
+#   setup.sh --font                Linux: install the WC3 icon font + fontconfig rules (macOS: the sbix font into ~/Library/Fonts) (fontconfig/install.sh;
 #                                  2 files owned by this package, --font-uninstall removes them)
 #   setup.sh --permissions         pre-grant the zellij plugin permissions for this checkout's wasm path(s) in
 #                                  zellij's permissions.kdl (else zellij asks once: press y)
@@ -122,11 +122,12 @@ EOF
   g=$(wasm_paths | while IFS= read -r w; do grep -qsF "\"$w\"" "$perms" && printf ' %s' "$w"; done)
   if [ -n "$g" ]; then echo "  zellij permissions pre-granted for:$g"
   else echo "  zellij permissions: not pre-granted (zellij asks once, press y; or: $0 --permissions)"; fi
-  if command -v fc-list >/dev/null 2>&1 && [ -n "$(fc-list ':family=WC3 Icons' 2>/dev/null)" ]; then
+  if { command -v fc-list >/dev/null 2>&1 && [ -n "$(fc-list ':family=WC3 Icons' 2>/dev/null)" ]; } \
+     || [ -f "$HOME/Library/Fonts/wc3-icons-mac.ttf" ] || [ -f /Library/Fonts/wc3-icons-mac.ttf ]; then
     echo "  WC3 icon font: installed (colour character icons)"
   else
     case "$(uname -s)" in
-      Darwin) echo "  WC3 icon font: not available on macOS (initials badges)" ;;
+      Darwin) echo "  WC3 icon font: not installed (initials badges; colour icons: $0 --font, then one terminal config line)" ;;
       *) echo "  WC3 icon font: not installed (initials badges; colour icons: $0 --font)" ;;
     esac
   fi

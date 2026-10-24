@@ -30,15 +30,15 @@ put() {
   [ "$_c" = "$2" ] || { printf '%s\n' "$2" >"$1.$$" && mv -f "$1.$$" "$1"; }
 }
 put "$root/pkgdir" "$here"
-# font flag: fc-list in the background (a cold fontconfig cache can take seconds); macOS = 0 (CoreText
-# draws no CBDT colour bitmaps)
+# font flag: fc-list in the background (a cold fontconfig cache can take seconds); macOS = 1 when fontconfig/install-mac.sh put
+# wc3-icons-mac.ttf (sbix build; CoreText draws no CBDT) into ~/Library/Fonts or /Library/Fonts
 # The claim is the directory font.claim (mkdir is atomic): one check at a time, also while font does not exist yet.
 if [ -z "$(find "$root/font" -mmin -10 2>/dev/null)" ]; then
   if mkdir "$root/font.claim" 2>/dev/null \
      || { [ -n "$(find "$root/font.claim" -maxdepth 0 -mmin +1 2>/dev/null)" ] && rmdir "$root/font.claim" 2>/dev/null && mkdir "$root/font.claim" 2>/dev/null; }; then
     ( v=0
       case "$(uname -s 2>/dev/null)" in
-        Darwin) ;;
+        Darwin) for _d in "$HOME/Library/Fonts" /Library/Fonts; do [ -f "$_d/wc3-icons-mac.ttf" ] && v=1; done ;;
         *) command -v fc-list >/dev/null 2>&1 && run_timeout 10 fc-list 'WC3 Icons' family 2>/dev/null | grep -qi 'WC3 Icons' && v=1 ;;
       esac
       printf '%s\n' "$v" >"$root/font.$$" && mv -f "$root/font.$$" "$root/font"

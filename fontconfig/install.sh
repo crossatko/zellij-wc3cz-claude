@@ -1,6 +1,6 @@
 #!/bin/sh
 # Optional: make the WC3 icon font (colour character icons in the tab bar) available to every terminal that
-# uses fontconfig, without editing any terminal config. Linux only. Run it yourself, or via `setup.sh --font`.
+# uses fontconfig, without editing any terminal config. Linux/BSD here; macOS: hands over to install-mac.sh. Run it yourself, or via `setup.sh --font`.
 #   fontconfig/install.sh               install / update (idempotent)
 #   fontconfig/install.sh --uninstall   remove the files again
 #   fontconfig/install.sh --check       show what fontconfig picks now, change nothing
@@ -47,8 +47,7 @@ say() { printf '  wc3-icons: %s\n' "$*"; }
 
 case "$(uname -s)" in
   Linux|*BSD|DragonFly) ;;
-  Darwin) say "macOS is not supported: CoreText cannot draw this CBDT colour bitmap font."
-          say "Nothing installed. The tab bar shows initials badges instead."; exit 0 ;;
+  Darwin) exec sh "$here/install-mac.sh" ${1:+"$1"} ;;   # sbix build, ~/Library/Fonts (no fontconfig)
   *) say "$(uname -s) is not supported (needs fontconfig). Nothing installed; the tab bar uses initials badges."
      exit 0 ;;
 esac
