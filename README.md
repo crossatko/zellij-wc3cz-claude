@@ -45,8 +45,8 @@ All scripts find each other relative to their own location, so the checkout can 
 - zellij 0.45.x, Claude Code with plugin support, a POSIX shell, `find`, `od`, `awk`, `sed`.
 - An audio player: `pw-play` (PipeWire) or `paplay`, `ffplay`, `aplay` on Linux; `afplay` on macOS
   (built in). Autodetected.
-- Optional: fontconfig on Linux for the colour icons (`fontconfig/install.sh`; the plugin detects the font
-  with `fc-list`, without it the bar shows initials badges); `ss` (iproute2, Linux) and a desktop helper for
+- Optional: the colour icon font (`fontconfig/install.sh`: fontconfig on Linux, `~/Library/Fonts` on macOS; the plugin detects the font
+  with `fc-list` / the font file, without it the bar shows initials badges); `ss` (iproute2, Linux) and a desktop helper for
   the OS-focus check (see "Away from the terminal"; `jq` for Sway; macOS needs `perl` or `timeout` from
   coreutils); `jq` for `setup.sh --migrate-to-plugin` / legacy options and the hook status; Rust with the
   `wasm32-wasip1` target only to rebuild.
@@ -114,15 +114,20 @@ That is all: voice lines, agent counts and attention markers work once a `claude
 run a hook (the hook tells the plugin where the package is). Plugin options go into the `plugin` block
 of the layout (see Options), e.g. `plugin location="file:..." { ding_when_focused false; }`.
 
-**Colour icons (optional, Linux)**: without the WC3 icon font the bar shows initials badges. With it,
+**Colour icons (optional, Linux and macOS)**: without the WC3 icon font the bar shows initials badges. With it,
 each character gets its portrait:
 
 ```sh
 sh ${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/marketplaces/zellij-wc3cz/fontconfig/install.sh   # --uninstall to undo
 ```
 
+On macOS the same command installs one file, `~/Library/Fonts/wc3-icons-mac.ttf` (an Apple `sbix` build, family
+`WC3 Icons Mac`), drops the cached font flag and prints the line your terminal needs (kitty:
+`symbol_map U+1FA70-U+1FAD6,U+1F7E0-U+1F7E6 WC3 Icons Mac`; ghostty: `font-codepoint-map`); it edits no terminal
+config. Quit and reopen the terminal afterwards.
+
 It writes three files that belong to this package (`~/.local/share/fonts/wc3-icons.ttf`,
-`~/.local/share/fonts/wc3-icons-wide.ttf` and `~/.config/fontconfig/conf.d/60-wc3-icons.conf`, creating
+`~/.local/share/fonts/wc3-icons-wide.ttf` and `~/.config/fontconfig/conf.d/60-wc3-icons.conf` (macOS: only `~/Library/Fonts/wc3-icons-mac.ttf`), creating
 `~/.config/fontconfig/conf.d/` if missing),
 runs `fc-cache` and drops the plugin's cached font flag; it edits no terminal config. Then close ALL
 windows of your terminal and start it again (a running kitty keeps its font set). If you installed the
@@ -148,7 +153,8 @@ bitmaps; details in `assets/wc3-icons/README.md`):
 | foot | `foot.ini` `[main]`: `font=monospace:size=8,WC3 Icons:size=8` (the icon font as fallback, same size as the text font; needs the emoji tag that `install.sh` adds) | foot defaults (monospace 8 = 6x16 cells): 12x16 in 12x16 with `WC3 Icons`, exact. Paper Mono 18 (15x29): use `WC3 Icons Wide`, 30x29, exact. foot clips at the cell, so a wrong variant is cut off. Verified |
 | alacritty | a fontconfig rule (alacritty has no fallback setting), e.g. `~/.config/fontconfig/conf.d/61-wc3-icons-alacritty.conf`: `<match target="pattern"><test name="prgname"><string>alacritty</string></test><test name="family"><string>YOUR FONT</string></test><edit name="family" mode="append" binding="same"><string>WC3 Icons Wide</string></edit></match>` inside `<fontconfig>` | alacritty draws the bitmap at font_px/96, not fitted to the cell, bottom anchored at the baseline: Paper Mono 18 with `font.offset.y = 0` (15x29): 30x29, exact. Other line heights overflow into the line above (`offset.y = -2`: 2 px) or leave a gap; build a `WC3 Icons Custom` font for that cell (`assets/wc3-icons/README.md`, e.g. 15x27: 30x27 exact) and name it in the rule. The rule also makes alacritty draw the race icons for the circle emoji U+1F7E0..U+1F7E6. Verified |
 | wezterm, konsole, others | untested | |
-| macOS terminals | not supported (CoreText draws no CBDT bitmaps): initials badges | |
+| kitty (macOS) | CoreText draws no CBDT, so a separate sbix font: `sh fontconfig/install.sh` (installs `~/Library/Fonts/wc3-icons-mac.ttf`) + `kitty.conf`: `symbol_map U+1FA70-U+1FAD6,U+1F7E0-U+1F7E6 WC3 Icons Mac` | Paper Mono 18 + `cell_height 110%` on Retina (22x47 px cells): 44x47 in 44x47, exact; stacked rows seamless. Other fonts/sizes: undistorted, may be smaller/clipped (rebuild recipe in `assets/wc3-icons/README.md`). Verified |
+| ghostty (macOS) | `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons Mac` (same install) | untested |
 
 A single bitmap cannot fit every cell: kitty and ghostty scale it to the cell, foot and alacritty draw it
 at the font size, so exact fits hold only for the settings named above (other sizes: smaller icon or gaps of
@@ -195,7 +201,7 @@ resolved against the session's working directory, not the layout file.
 double registration, layout snippet, permission grant, font) and changes nothing. Each change needs its
 own option:
 
-- `--font` / `--font-uninstall`: `fontconfig/install.sh` (Linux).
+- `--font` / `--font-uninstall`: `fontconfig/install.sh` (Linux; macOS: `install-mac.sh`).
 - `--permissions`: pre-grant the plugin permissions in zellij's `permissions.kdl` for this checkout's
   wasm path (zellij keys grants by the exact `~`-expanded path, symlinks not resolved); the file is
   rewritten atomically and keeps its other content.
@@ -316,7 +322,7 @@ strings or bare true/false (`true/1/yes/on`, `false/0/no/off`); they are read wh
 | `blink_ms` | `900` | blink phase (200-5000) |
 | `blink_timeout_s` | `600` | stop blinking after this (0 = never) |
 | `race_icons` | `true` | show the character icon (colour font) or its initials badge |
-| `race_font` | `auto` | colour WC3 icon font. `auto` = on when the hook found the `WC3 Icons` font installed (`fc-list`, re-checked every 10 min; macOS never), otherwise each tab shows a 2-cell initials badge (`AM` Arthas Menethill, `ČA` Čarodějka; unique for all 92 characters) on a chip of the character's colour, which works in any terminal. `true` forces the icon font, `false` forces the initials badges |
+| `race_font` | `auto` | colour WC3 icon font. `auto` = on when the hook found the `WC3 Icons` font installed (`fc-list`; on macOS the file `wc3-icons-mac.ttf` in `~/Library/Fonts` or `/Library/Fonts`; re-checked every 10 min), otherwise each tab shows a 2-cell initials badge (`AM` Arthas Menethill, `ČA` Čarodějka; unique for all 92 characters) on a chip of the character's colour, which works in any terminal. `true` forces the icon font, `false` forces the initials badges |
 | `race_tab_colors` | `true` | tint tabs in the character's colour |
 | `race_dim` | `0.4` | brightness of inactive tinted tabs (0.1-1.0) |
 | `plain_dim` | `0.18` | brightness of inactive untinted tabs (plain tabs): the theme's ribbon colour blended toward the bar background (0.1-1.0, 1.0 = theme colour as is). The default gives a plain tab the same luminance as the median inactive Claude tab at `race_dim` 0.4 |
@@ -409,13 +415,13 @@ rust-wasm`. `target/` is git-ignored.
 - **Bar and hooks disagree after `claude plugin update`**: the layout loads the marketplace clone's wasm,
   which only changes with `claude plugin marketplace update zellij-wc3cz`.
 
-## macOS checklist (not tested on a Mac)
+## macOS checklist
 
 Run in a zellij pane on the Mac and check the result:
 
 ```sh
 zellij --version                                     # 0.45.x
-sh <pkg>/setup.sh     # status only; "WC3 icon font: not available on macOS"
+sh <pkg>/setup.sh     # status only; "WC3 icon font: not installed" until `fontconfig/install.sh` ran
 printf '%s\n' "$TMPDIR"; ls "${TMPDIR%/}"/zellij-$(id -u)/   # must contain zellij-log
 sh <pkg>/claude-hook.sh start; ls "${TMPDIR%/}"/zellij-$(id -u)/zellij-claude/*/   # a file named like the pane id
 afplay <pkg>/sounds/ding.wav

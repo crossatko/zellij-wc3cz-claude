@@ -44,8 +44,11 @@ stay with the system emoji font, and a character without an icon glyph then show
   the character codepoints only; tag the `WC3 Icons*` families as emoji fonts, lang `und-zsye`, which foot
   needs) and runs `fc-cache -f` on the font dir. Then restart the terminal. Check: `fontconfig/install.sh --check`.
   `--uninstall` removes the files (and a `WC3 Icons Custom` build saved as `wc3-icons-custom.ttf`).
-- macOS: NOT installed. kitty on macOS renders through CoreText, which has no CBDT support, so the
-  plugin shows initials badges there (`race_font "auto"`).
+- macOS: `fontconfig/install.sh` (or `setup.sh --font`) hands over to `fontconfig/install-mac.sh`, which copies
+  `wc3-icons-mac.ttf` (family `WC3 Icons Mac`, sbix) to `~/Library/Fonts/` (a foreign file of that name is never
+  overwritten; `--uninstall`, `--check`) and prints the terminal line (kitty `symbol_map`, ghostty
+  `font-codepoint-map`); restart the terminal completely. The plugin's `race_font auto` is on when that file
+  exists in `~/Library/Fonts` or `/Library/Fonts`.
 
 ## Rebuild
 
@@ -130,12 +133,38 @@ BY=84 python3 build.py wc3-icons-custom.ttf 1212 4 108` -> 30x27, exact (also st
 Rule of thumb: kitty with a tall line height -> `WC3 Icons`; ghostty -> `WC3 Icons Wide` (any size);
 foot/alacritty -> the variant whose height (1.5 x font px for `WC3 Icons`, 1.21 x font px for Wide) equals
 the cell height, else a custom build. Untested: wezterm, konsole, gnome-terminal, xterm, st, rio, contour;
-macOS (CoreText has no CBDT, see Install). A terminal that cannot draw CBDT shows another emoji or a box:
+macOS terminals other than kitty (see "macOS font" below). A terminal that cannot draw CBDT shows another emoji or a box:
 `race_font false` (initials badges).
 
 Limits of the CBDT small metrics: height/width <= 255 and BY <= 127 as bytes. When testing, give test builds a
 different `FAMILY` (an installed font with the same family silently wins; use a private FONTCONFIG_FILE and
 XDG_DATA_HOME, or the real user fonts dir is scanned too).
+
+## macOS font (sbix)
+
+CoreText does NOT draw the CBDT font (tested with kitty 0.49.2 on macOS 26: boxes). macOS needs Apple's `sbix`
+(PNG strikes), so `build.py` has a second output, selected with `SBIX=1`; same glyphs, codepoints and bitmaps,
+but an `sbix` table instead of CBDT/CBLC (plus a full and PostScript name: without them `CTFontCreate...` and kitty
+find the family only intermittently). `glyf` stays (empty outlines; a box outline per glyph made CoreText drop
+the family, so do not add one). The default (CBDT) builds are unchanged: only the `head` timestamp differs on rebuild.
+
+```sh
+cd assets/wc3-icons
+FAMILY="WC3 Icons Mac" SBIX=1 PPEM=72 BY=72 ASPECT=0.9362 python3 build.py wc3-icons-mac.ttf 1222 4 94
+```
+
+Geometry (kitty on macOS, Retina = 2 pixels per point, so font_px = 2 x font_size): the strike is scaled by
+font_px/PPEM, the glyph origin is the pen position on the baseline, the bitmap bottom-left sits at
+(BX, BY - S) strike pixels from it (`originOffsetY = BY - S`, S = bitmap height, the 4th argument). Wanted: a bitmap
+of exactly 2 cells x 1 line. With Paper Mono 18 + `modify_font cell_height 110%` the cell is 22 x 47 px, baseline
+36 px below the cell top (descent 11 px). So: S = 47 x PPEM/36 = 94, W = 2 x 22 x PPEM/36 = 88 (ASPECT = 88/94 = 0.9362),
+advance = 2 x 22/36 x 1000 = 1222 units, BY = S - descent px x PPEM/36 = 94 - 22 = 72. kitty clips glyphs to the
+cell: a BY too large clips the top of the icon, too small leaves a gap at the top (BY=188 at PPEM 144 clipped 11 px,
+BY=144 was exact). Measured on the screenshot of an isolated kitty: icon 44 x 47 px per cell pair, stacked rows
+seamless, whole faces, tinted backgrounds visible only left and right of the 2-cell icon. Other fonts/sizes:
+measure the cell (`TIOCGWINSZ` pixel size / rows) and the baseline offset, re-derive with the formulas, pass the
+numbers to `build.py` and use a new family name AND file name (CoreText caches by family; a changed font under an old
+name showed the fallback "?" boxes until the name changed).
 
 ## Swap an icon
 

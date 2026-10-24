@@ -79,7 +79,7 @@ written blind.
   `zellij --layout X` inside a session or with `-s` ADDS tabs; `zellij -n X` starts a new session. Plugin
   options go in the layout's plugin block. Shipped layout loads
   `file:~/.claude/plugins/marketplaces/zellij-wc3cz/claude-tabs.wasm` (verified in an isolated session).
-- `fontconfig/install.sh` (Linux/BSD; macOS/others print "not supported, initials badges", exit 0): copies
+- `fontconfig/install.sh` (Linux/BSD; Darwin execs install-mac.sh; other OSes print "not supported, initials badges", exit 0): copies
   `wc3-icons.ttf` and `wc3-icons-wide.ttf` to `${XDG_DATA_HOME:-~/.local/share}/fonts/` (never overwrites a
   foreign file of that name), writes `${XDG_CONFIG_HOME:-~/.config}/fontconfig/conf.d/60-wc3-icons.conf`
   GENERATED from the font's charset (repo copy = `install.sh --print-conf`; regenerate after font changes:
@@ -204,8 +204,9 @@ written blind.
   older than 12 h are ignored. Verified in an isolated session with simulated payloads; NOT with real
   payloads (Notification/PermissionRequest `agent_id` for subagents unconfirmed).
 - `<state root>/font` (`1`/`0`): the hook runs `fc-list 'WC3 Icons' family` in the BACKGROUND when the file is
-  missing or older than 10 min (touched first so parallel hooks do not re-check); Darwin or no fc-list = 0.
-  Depends on the hook's $HOME. Plugin `race_font auto` = this flag; `on`/`off` force.
+  missing or older than 10 min (touched first so parallel hooks do not re-check); no fc-list = 0. Darwin: 1 when
+  `wc3-icons-mac.ttf` exists in `~/Library/Fonts` or `/Library/Fonts` (no fc-list; `install-mac.sh` removes the
+  file after installing). Depends on the hook's $HOME. Plugin `race_font auto` = this flag; `on`/`off` force.
 - Duplicate hooks (plugin + settings hooks; Claude Code dedupes only identical command strings): every event
   except tool/clear does `mkdir <pane>.once.<cksum of event+JSON>`; the loser exits; any other event of the
   pane removes old markers. Temp files are `.$$`-suffixed. `end` and the plugin's `cleanup_stale` remove
@@ -400,8 +401,7 @@ written blind.
 ## Icon font (`assets/wc3-icons/`)
 - `wc3-icons.ttf`: CBDT colour bitmap font, family `WC3 Icons`: the 92 character glyphs U+1FA70..U+1FAD6
   (plus the 7 race glyphs U+1F7E0..U+1F7E6, 2 cells wide, used for characters without an icon). Installed on
-  Linux only on request by `fontconfig/install.sh` (= `setup.sh --font`). macOS: flag always 0 (CoreText
-  has no CBDT; an sbix variant would be needed).
+  Linux only on request by `fontconfig/install.sh` (= `setup.sh --font`). macOS: see the next bullet (sbix build).
 - Rebuild: `cd assets/wc3-icons && python3 build.py` (defaults: FAMILY "WC3 Icons", PPEM 96, S 144, width 112
   (ASPECT 0.7778), BY 116, reference cells 14x36; needs python3 with fonttools + Pillow). The icon is
   centre-cropped to ASPECT (never squashed), 4 px frame cropped only when `has_frame()` sees it. Why these
@@ -437,10 +437,19 @@ written blind.
 - Risks: `get_pane_cwd`, `getconf DARWIN_USER_TEMP_DIR`, BSD find/od/grep flags, perl Time::HiRes, ✳/spinner
   glyphs drawn as emoji, afplay FLAC (10.13+, from memory), two zellij servers with differing TMPDIR.
   Checklist: README "macOS checklist".
-- Icon font TODO (needs a Mac): the font is CBDT/CBLC; CoreText is believed (NOT tested) to draw only
-  `sbix`. Test first: install the font, set `race_font on`, look. If the icons don't render: add an `sbix`
-  build (same codepoints, 2 cells wide) to build.py, install it on Darwin, keep `race_font` auto-off until
-  verified, tune bitmap size per terminal. Until then macOS uses initials badges.
+- Icon font (verified 2026-10-23 on macOS 26, kitty 0.49.2, Apple Silicon, Paper Mono 18 + cell_height 110%): CoreText
+  does NOT draw the CBDT font (boxes), so `build.py` has `SBIX=1` -> `assets/wc3-icons/wc3-icons-mac.ttf` (family
+  `WC3 Icons Mac`, PNG strike PPEM 72, 88x94 px = 44x47 px per 2 cells on Retina; recipe + geometry formulas in
+  `assets/wc3-icons/README.md`, "macOS font"). `fontconfig/install.sh` execs `fontconfig/install-mac.sh` on Darwin
+  (`~/Library/Fonts/wc3-icons-mac.ttf`, never overwrites a foreign file, `--uninstall`, `--check`, drops the font
+  flag, prints the kitty `symbol_map U+1FA70-U+1FAD6,U+1F7E0-U+1F7E6 WC3 Icons Mac` / ghostty lines; edits no
+  terminal config). Verified by screenshots of an isolated kitty (`screencapture -l <id>`, window found by pid;
+  needs Screen Recording for the host app): colour, whole faces, 44x47 per icon, stacked rows seamless. Pitfalls:
+  (1) the font needs name IDs 3/4/5/6, else CoreText family lookups fail; (2) a per-glyph box outline in `glyf`
+  broke the family; (3) CoreText caches by family/file: a rebuilt font under an old family+file name showed
+  fallback "?" boxes, use a new name while tuning; (4) kitty clips glyphs to the cell, so BY must be exact.
+  NOT verified: real zellij bar on mac, other font sizes, non-Retina, ghostty/others, `/Library/Fonts`.
+  The hook flag on Darwin was checked with a scratch TMPDIR (1 with the font installed).
 
 ## Known issues / caveats
 - With two package copies the plugin sticks to the first confirmed one (not necessarily the newest);
