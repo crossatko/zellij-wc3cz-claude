@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the WC3 Icons CBDT colour bitmap font (used by the zellij claude-tabs plugin in kitty on Linux).
 
-usage: python3 build.py [OUT.ttf [ADVANCE_UNITS [CROP_PX [BITMAP_HEIGHT]]]]
+usage: [SBIX=1] python3 build.py [OUT.ttf [ADVANCE_UNITS [CROP_PX [BITMAP_HEIGHT]]]]
 defaults: wc3-icons.ttf next to this script, 1212, 4, 144; env FAMILY="WC3 Icons" PPEM=96 BY=116 BX=0 ASPECT=0.7778 CROP_KEEP=<ASPECT>.
 Design: each bitmap is a centre-crop of the icon to the aspect ASPECT (width/height, no squash), so it is never
 distorted; terminals only scale a colour bitmap uniformly to fit the 2-cell box (kitty), so any cell size works,
@@ -84,6 +84,20 @@ for i,path in enumerate(SRC):
     b=io.BytesIO()
     im.save(b,"PNG",optimize=True)
     bitmaps[f"wc3_{i}"]=b.getvalue()
+if os.environ.get("SBIX"):  # Apple sbix colour bitmap (macOS CoreText); same glyphs/bitmaps, see README "macOS"
+    from fontTools.ttLib.tables.sbixStrike import Strike as SbixStrike
+    from fontTools.ttLib.tables.sbixGlyph import Glyph as SbixGlyph
+    fam=os.environ.get("FAMILY","WC3 Icons"); nm=font["name"]  # CoreText wants full + PostScript names too
+    for nid,val in ((3,fam+" sbix"),(4,fam+" Regular"),(5,"Version 1.0"),(6,fam.replace(" ","")+"-Regular")):
+        for pl,en,lg in ((3,1,0x409),(1,0,0)): nm.setName(val,nid,pl,en,lg)
+    sb=newTable("sbix"); sb.version=1; sb.flags=1; sb.strikes={}
+    stk=SbixStrike(ppem=ppem,resolution=72); stk.glyphs={}
+    for gname,png in bitmaps.items():
+        stk.glyphs[gname]=SbixGlyph(glyphName=gname,graphicType="png ",imageData=png,originOffsetX=BX,originOffsetY=bearingY-S)
+    stk.glyphs[".notdef"]=SbixGlyph(glyphName=".notdef",graphicType=None,imageData=None)
+    sb.strikes[ppem]=stk
+    font["sbix"]=sb
+    font.save(out); print("wrote",out,os.path.getsize(out)); sys.exit(0)
 # build CBDT / CBLC
 cbdt=newTable("CBDT"); cblc=newTable("CBLC")
 cbdt.version=3.0; cblc.version=3.0
