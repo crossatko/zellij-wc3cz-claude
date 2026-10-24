@@ -426,6 +426,27 @@ written blind.
   private FONTCONFIG_FILE + XDG_CONFIG_HOME + XDG_CACHE_HOME (scan rules need a fresh cache); foot 1.28 uses
   `[colors-dark]` (old `[colors]` is an error); ghostty reloads on SIGUSR2, kitty on SIGUSR1, alacritty live.
 
+## macOS install (short checklist; same route as Linux, README Quick start)
+1. Prereqs: `brew install zellij` (0.45.x), Claude Code. No Rust needed (the wasm is prebuilt and tracked);
+   sounds use `afplay` (built in).
+2. Hooks: `claude plugin marketplace add crossatko/zellij-wc3cz-claude` +
+   `claude plugin install zellij-wc3cz@zellij-wc3cz` (once per `CLAUDE_CONFIG_DIR`), then `/reload-plugins`
+   or restart every running `claude`.
+3. Permissions (optional, skips the in-bar `Allow? (y/n)`):
+   `sh ~/.claude/plugins/marketplaces/zellij-wc3cz/setup.sh --permissions` (writes
+   `~/Library/Caches/org.Zellij-Contributors.Zellij/permissions.kdl`).
+4. Bar: `zellij -n ~/.claude/plugins/marketplaces/zellij-wc3cz/layouts/claude.kdl` (or copy it to
+   `~/.config/zellij/layouts/claude.kdl` and `zellij -n claude` / `default_layout "claude"`).
+5. Colour icons (optional; without them initials badges): `sh ~/.claude/plugins/marketplaces/zellij-wc3cz/
+   fontconfig/install.sh` (-> `install-mac.sh`: `~/Library/Fonts/wc3-icons-mac.ttf` + `wc3-icons-mac-ghostty.ttf`),
+   then the terminal line it prints: kitty `symbol_map U+1FA70-U+1FAD6,U+1F7E0-U+1F7E6 WC3 Icons Mac`; ghostty
+   `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons Wide` and the same for `U+1F7E0-U+1F7E6`. Restart the terminal fully.
+6. Updating: `claude plugin marketplace update zellij-wc3cz` + `claude plugin update zellij-wc3cz@zellij-wc3cz`,
+   reload every running `claude`; if the bar still shows initials after a font install, delete
+   `<state root>/font` (`$TMPDIR/zellij-$(id -u)/zellij-claude/font`).
+7. Check: README "macOS checklist". Steps 2-5 + updating verified on one Mac (2026-10-23); hooks/afplay/os-focus
+   runtime not yet (see below).
+
 ## macOS (written without a Mac; unverified)
 - 2026-10-23 first Mac install (Darwin 25, zellij 0.45.1, Claude Code 2.1.310, no Rust toolchain):
   `claude plugin marketplace add crossatko/zellij-wc3cz-claude` + `install` worked (HTTPS clone);
