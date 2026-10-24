@@ -3,8 +3,8 @@
 A drop-in replacement for zellij's stock `compact-bar` (same look and mouse behaviour, ported from
 zellij 0.45.1) with extras for running Claude Code agents in tabs:
 
-- **Claude marker** `✳` before every tab that runs Claude Code, animated with Claude Code's own
-  spinner while the agent works, a number for running subagents (`✳2`), a badge plus a blinking tab
+- **Claude marker** `✻` before every tab that runs Claude Code, animated with Claude Code's own
+  spinner while the agent works, a number for running subagents (`✻2`), a badge plus a blinking tab
   when an agent finished in a tab you have not looked at yet.
 - **Characters**: every Claude tab gets one Warcraft III character (91 with Czech voice lines, e.g.
   Arthas Menethill, Thrall, Illidan; unique up to 91 tabs), shown as the character's portrait icon
@@ -315,8 +315,8 @@ strings or bare true/false (`true/1/yes/on`, `false/0/no/off`); they are read wh
 | `clock_character` | `true` | name of the active tab's character left of the clock (needs `clock`; truncated, then dropped, when space is short) |
 | `show_other_clients` | `false` | stock `[ ]` markers of other attached clients |
 | `active_underline` | `false` | underline the active tab |
-| `subagent_count` | `true` | number of running subagents after `✳` |
-| `spinner` | `true` | animated `✳` while working (`false` = static, italic) |
+| `subagent_count` | `true` | number of running subagents after `✻` |
+| `spinner` | `true` | animated `✻` while working (`false` = static, italic) |
 | `spin_ms` | `160` | spinner step (60-2000) |
 | `blink` | `true` | blink finished-unseen tabs |
 | `blink_ms` | `900` | blink phase (200-5000) |

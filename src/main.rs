@@ -31,7 +31,7 @@ pub struct TabRenderData {
     pub is_swap_layout_dirty: bool,
 }
 
-const ICON: &str = "\u{2733}"; // eight-spoked asterisk, the glyph Claude Code itself uses
+const ICON: &str = "\u{273B}"; // teardrop-spoked asterisk: text-only codepoint (U+2733 is Emoji=Yes and can be drawn as a colour emoji)
 // Race identities. Edit this table to change glyphs / accent colours (rgb is blended with the theme).
 const RACES: &[(&str, &str, (u8, u8, u8), Option<&str>)] = &[
     // name, symbol glyph, accent, colour-font codepoint (race_font; 2 cells wide, from the WC3 icon font)
@@ -399,7 +399,7 @@ fn badge_table(names: &[String]) -> HashMap<String, String> {
 }
 
 // Claude Code's own spinner frames (ping-pong: forward then back, period 10); all one cell wide
-const SPIN: [&str; 10] = ["\u{B7}", "\u{2722}", "\u{2733}", "\u{2736}", "\u{273B}", "\u{273D}", "\u{273B}", "\u{2736}", "\u{2733}", "\u{2722}"];
+const SPIN: [&str; 10] = ["\u{B7}", "\u{2722}", "\u{2743}", "\u{2736}", "\u{273B}", "\u{273D}", "\u{273B}", "\u{2736}", "\u{2743}", "\u{2722}"];
 
 const STATE_ROOT: &str = "/tmp/zellij-claude";
 

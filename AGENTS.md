@@ -7,8 +7,8 @@ Keep entries short and factual, update in place, no histories, no secrets, no pe
 ## What it is
 A zellij 0.45 tab-bar plugin (Rust -> wasm32-wasip1, zellij-tile 0.45.1) that replaces the stock
 `compact-bar` (ported from zellij v0.45.1 `default-plugins/compact-bar`: `line.rs`, `tab.rs`, clipboard
-hints; tooltips dropped) and adds Claude Code awareness: `✳` marker + Claude Code's spinner while working,
-running-subagent count (`✳2`), finished-unseen badge + blink, attention alerts (`?` badge), one Warcraft III
+hints; tooltips dropped) and adds Claude Code awareness: `✻` marker + Claude Code's spinner while working,
+running-subagent count (`✻2`), finished-unseen badge + blink, attention alerts (`?` badge), one Warcraft III
 CHARACTER per Claude tab (icon + tint + voice, 91 characters with clips), a Czech WC3 voice line of that
 character when an agent finishes or asks (fallback `sounds/ding.wav`), cwd-based tab labels, clock, optional
 character name next to the clock. Linux verified; macOS install and icons verified on one Mac, macOS runtime
@@ -246,7 +246,7 @@ character name next to the clock. Linux verified; macOS install and icons verifi
   luminance of inactive Claude tabs at race_dim 0.4, test-guarded; 1 = off) and picks text at just 4.5:1;
   not applied to active/blinking/bell/session-dimmed tabs or 8-bit themes. Working = italic marker,
   finished-unseen = inverted badge, blink phase `(ms / blink_ms) % 2`, `blink_timeout_s` (600). Spinner
-  frames `· ✢ ✳ ✶ ✻ ✽` ping-pong (Claude Code 2.1.303). Options `race_icons/race_font/race_tab_colors/
+  frames `· ✢ ❃ ✶ ✻ ✽` ping-pong (Claude Code 2.1.303 uses ✳ at the third frame; swapped for ❃ because U+2733 is an emoji codepoint; the title match in main.rs still looks for ✳). Options `race_icons/race_font/race_tab_colors/
   race_dim/race_all_tabs` keep their old names.
 - Initials badge (no colour font: `race_font` off, or auto with font flag 0): 2-cell chip instead of the glyph
   (`badge_candidates`/`badge_table`, `badge_colors`): initials of words 1+2 (single word: letters 1+2),
@@ -451,7 +451,7 @@ character name next to the clock. Linux verified; macOS install and icons verifi
   symbols (U+2694/U+2620 may render as emoji), `uname -s` via run_command, dev.sh fswatch or stat polling.
   The font flag on Darwin was checked with a scratch TMPDIR (1 with the font installed).
 - Risks (unverified): `get_pane_cwd`, `getconf DARWIN_USER_TEMP_DIR`, BSD find/od/grep flags, perl
-  Time::HiRes, ✳/spinner glyphs drawn as emoji, afplay FLAC (10.13+, from memory), two zellij servers with
+  Time::HiRes, spinner glyphs drawn as emoji (marker uses text-only U+273B), afplay FLAC (10.13+, from memory), two zellij servers with
   differing TMPDIR.
 
 ## Integration with a user's dotfiles (what such a setup needs)
