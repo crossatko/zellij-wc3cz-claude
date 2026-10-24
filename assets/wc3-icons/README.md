@@ -170,7 +170,7 @@ name showed the fallback "?" boxes until the name changed).
 ### ghostty on macOS
 
 ghostty (1.3.1, read in `src/font/face/coretext.zig` and `SharedGrid.zig`) renders every colour glyph (any font with an
-`sbix` table is "emoji") with the constraint size=cover, centred, 2.5 % side padding: the glyph's bounding rect (from
+`sbix` table is "emoji") with the constraint size=cover, centred, 2.5 % side padding (undone by a GPOS shift, item 4): the glyph's bounding rect (from
 the font OUTLINE, `CTFontGetBoundingRectsForGlyphs`; a glyph without outline has a 0-size rect and draws NOTHING) is
 scaled uniformly into 2 cells x the primary font's natural line height (`face_height`, NOT the cell height:
 `adjust-cell-height` only adds space around it), centred, then CoreText draws the bitmap into that canvas and
@@ -184,19 +184,24 @@ anything outside the canvas is cropped. So:
    rect out of register and the canvas crops the bottom (first try: 32 of 43 px, face cut off at the mouth).
    Use offset 0: `BY=S`, the bitmap then sits on the baseline exactly where its outline is.
 3. Bitmap natural size = W x font_px/PPEM, outline = same in units (`W*1000/PPEM`), so they agree at every size.
-4. The aspect decides the shape, and ghostty keeps 2.5 % side padding for emoji (`pad_left/right`) plus whole-pixel
-   rounding: at `adjust-cell-height = 0` (Paper Mono 18, Retina: 22 x 43 px cells, 2-cell box 44 x 43) the icon can
-   be at most 42 px wide, so there is always 1 px of the tab colour on each side. The shipped square build
-   (ASPECT 1.0) gives 42 x 42 px (1 px gaps, ~0.5 px vertical); the portrait 0.9362 gave 40 x 43 (2 px gaps, which
-   showed as a strip on the left of the first icon in the bar), a wider ASPECT 1.04 shrinks the height (41 x 40).
-   Scanning ASPECT 0.98..1.04 and shifting the outline never got below 1 px: the canvas is centred and capped.
-   `adjust-cell-height = N` leaves N px above/below.
+4. Emoji padding and the shift that undoes it. ghostty constrains every colour glyph with size=cover, centred,
+   `pad_left/right = 0.025` (`src/font/SharedGrid.zig` `renderGlyph`, 1.3.1), then rounds an sbix canvas to whole
+   px (`src/font/face/coretext.zig` `renderGlyph`). With Paper Mono 18 on Retina (face 21.82 x 43.2 px, cells
+   22 x 43, 2-cell box 44 x 43) the canvas starts ~0.7 px in and rounds to x = 1: a 1 px strip of tab colour on
+   the left, whatever the aspect or outline. The renderer adds the SHAPER's x offset after all that
+   (`src/renderer/generic.zig` `addGlyph`, `bearings = offset_x + x_offset`; `src/font/shaper/coretext.zig`
+   `x_offset = round(position.x - cell_offset.x)`), so a GPOS single adjustment `XPlacement` (`SBIX_DX`, feature
+   `kern`, on by default) moves the finished canvas: -22 units = -0.79 px at 36 px, rounded to -1 px. Result:
+   icon 42-43 x 43 px flush with the left cell edge and full height; the 1-2 px left over on the right sit next to
+   the space the plugin pads after every icon, so they read as part of it. ASPECT 0.99 (93 x 94 strike) fills
+   the face height (1.0 leaves a background row per line). `adjust-cell-height = N` leaves N px above/below.
+   The shift is tuned for this size: at much larger sizes the padding can round to 2 px (raise `SBIX_DX`).
 5. The family is named exactly like the Linux font ("WC3 Icons Wide"), because `font-codepoint-map` with a family
    that does not exist is silently ignored (system emoji show) but the LAST matching map line wins even if its family
    is missing, so two lines (one per OS) cannot share a config; one name can.
 
 ```sh
-FAMILY="WC3 Icons Wide" SBIX=1 SBIX_BOX=1 PPEM=72 BY=94 ASPECT=1.0 python3 build.py wc3-icons-mac-ghostty.ttf 1222 4 94
+FAMILY="WC3 Icons Wide" SBIX=1 SBIX_BOX=1 SBIX_DX=-22 PPEM=72 BY=94 ASPECT=0.99 python3 build.py wc3-icons-mac-ghostty.ttf 1222 4 94
 ```
 
 Verified by screenshot of an isolated ghostty (Paper Mono 18, `adjust-cell-height = 0`): no background row between
