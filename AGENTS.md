@@ -404,13 +404,14 @@ character name next to the clock. Linux verified; macOS install and icons verifi
   while tuning (a rebuilt font under an old name shows "?" boxes); kitty clips glyphs to the cell, so BY must
   be exact.
 - ghostty on macOS (1.3.1): second font `wc3-icons-mac-ghostty.ttf`, family `WC3 Icons Wide` (same family as
-  Linux, so the shared dotfiles ghostty config works on both OSes), built `SBIX=1 SBIX_BOX=1 SBIX_DX=-22 PPEM=72
+  Linux, so the shared dotfiles ghostty config works on both OSes), built `SBIX=1 SBIX_BOX=1 SBIX_DX=48 PPEM=72
   BY=94 ASPECT=0.99` (recipe in README "ghostty on macOS"). ghostty fits the OUTLINE rect into 2 cells x
   face_height and crops the CoreText-drawn bitmap to that canvas; CoreText does not scale `originOffsetY` with
-  the font size, so BY must equal S. ghostty pads emoji 2.5 % per side (SharedGrid.zig) and rounds sbix canvases to whole px, which left 1 px of tab
-  colour on the left; the renderer adds the shaper's GPOS x offset AFTER that, so `SBIX_DX=-22` (GPOS `kern`
-  XPlacement, -1 px at 36 px) shifts the icon flush left. Result at `adjust-cell-height = 0`: 42-43 x 43 px, 0 px
-  left, full height; 1-2 px on the right merge with the plugin's padding space. Tuned for Paper Mono 18 Retina.
+  the font size, so BY must equal S. ghostty pads emoji 2.5 % per side (SharedGrid.zig) and rounds sbix canvases to whole px; the renderer adds
+  the shaper's GPOS x offset AFTER that, unclipped, so `SBIX_DX` (GPOS `kern` XPlacement, units/1000 of font px)
+  sets the left gap. A font cannot see the size or `adjust-cell-height`, so it is tuned per setting: 48 = 2 px
+  left at font-size 21 + `adjust-cell-height = 4` (2 px top/bottom too, icon 50x50; formula + table in the
+  icons README). Other settings may leave 0-1 px or overlap the previous cell by 1 px.
   kitty: 0 px, 44 px exact. A glyph
   without outline draws nothing; a glyph object shared between names compiles once (others empty); kitty
   shrinks icons that have the box (kitty font has none). A `font-codepoint-map` to a missing family is
