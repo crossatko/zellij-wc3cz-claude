@@ -435,7 +435,8 @@ written blind.
   plugin cache copy (`${CLAUDE_PLUGIN_ROOT}` = old sha), whose Darwin branch always writes font flag 0.
   Fix: `claude plugin marketplace update zellij-wc3cz` + `claude plugin update zellij-wc3cz@zellij-wc3cz`,
   `/reload-plugins` (or restart) in EVERY running claude, then delete `<state root>/font`. Any old-version
-  hook still running rewrites 0 on its next 10-min re-check.
+  hook still running rewrites 0 on its next 10-min re-check. After that: colour portraits in the REAL zellij
+  bar on the Mac (kitty, `symbol_map ... WC3 Icons Mac`), confirmed by the owner 2026-10-23.
 - Done for it: claude-lib.sh (Homebrew PATH, state-root candidates, `run_timeout` timeout/gtimeout/perl,
   `now_ns` without `%N`), no GNU-only flags, `get_pane_cwd` instead of /proc, chess pieces for human/orc
   symbols (U+2694/U+2620 may render as emoji), `uname -s` via run_command, dev.sh fswatch or stat polling.
