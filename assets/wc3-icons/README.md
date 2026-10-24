@@ -184,15 +184,19 @@ anything outside the canvas is cropped. So:
    rect out of register and the canvas crops the bottom (first try: 32 of 43 px, face cut off at the mouth).
    Use offset 0: `BY=S`, the bitmap then sits on the baseline exactly where its outline is.
 3. Bitmap natural size = W x font_px/PPEM, outline = same in units (`W*1000/PPEM`), so they agree at every size.
-4. The aspect decides the shape: at `adjust-cell-height = 0` (Paper Mono 18, Retina: 22 x 43 px cells) the normal
-   portrait ASPECT 0.9362 fills the full height, 40 x 43 px, undistorted, 2 px gaps left and right; the Wide
-   aspect 1.0345 gives 41 x 40 (width-limited). `adjust-cell-height = N` leaves N px above/below either way.
+4. The aspect decides the shape, and ghostty keeps 2.5 % side padding for emoji (`pad_left/right`) plus whole-pixel
+   rounding: at `adjust-cell-height = 0` (Paper Mono 18, Retina: 22 x 43 px cells, 2-cell box 44 x 43) the icon can
+   be at most 42 px wide, so there is always 1 px of the tab colour on each side. The shipped square build
+   (ASPECT 1.0) gives 42 x 42 px (1 px gaps, ~0.5 px vertical); the portrait 0.9362 gave 40 x 43 (2 px gaps, which
+   showed as a strip on the left of the first icon in the bar), a wider ASPECT 1.04 shrinks the height (41 x 40).
+   Scanning ASPECT 0.98..1.04 and shifting the outline never got below 1 px: the canvas is centred and capped.
+   `adjust-cell-height = N` leaves N px above/below.
 5. The family is named exactly like the Linux font ("WC3 Icons Wide"), because `font-codepoint-map` with a family
    that does not exist is silently ignored (system emoji show) but the LAST matching map line wins even if its family
    is missing, so two lines (one per OS) cannot share a config; one name can.
 
 ```sh
-FAMILY="WC3 Icons Wide" SBIX=1 SBIX_BOX=1 PPEM=72 BY=94 ASPECT=0.9362 python3 build.py wc3-icons-mac-ghostty.ttf 1222 4 94
+FAMILY="WC3 Icons Wide" SBIX=1 SBIX_BOX=1 PPEM=72 BY=94 ASPECT=1.0 python3 build.py wc3-icons-mac-ghostty.ttf 1222 4 94
 ```
 
 Verified by screenshot of an isolated ghostty (Paper Mono 18, `adjust-cell-height = 0`): no background row between
