@@ -427,6 +427,10 @@ written blind.
   `[colors-dark]` (old `[colors]` is an error); ghostty reloads on SIGUSR2, kitty on SIGUSR1, alacritty live.
 
 ## macOS (written without a Mac; unverified)
+- 2026-10-23 first Mac install (Darwin 25, zellij 0.45.1, Claude Code 2.1.310, no Rust toolchain):
+  `claude plugin marketplace add crossatko/zellij-wc3cz-claude` + `install` worked (HTTPS clone);
+  `setup.sh --link --permissions` wrote `~/Library/Caches/org.Zellij-Contributors.Zellij/permissions.kdl`.
+  Runtime behaviour on the Mac NOT yet checked (bar, hooks, afplay, os-focus): next step.
 - Done for it: claude-lib.sh (Homebrew PATH, state-root candidates, `run_timeout` timeout/gtimeout/perl,
   `now_ns` without `%N`), no GNU-only flags, `get_pane_cwd` instead of /proc, chess pieces for human/orc
   symbols (U+2694/U+2620 may render as emoji), `uname -s` via run_command, dev.sh fswatch or stat polling.
