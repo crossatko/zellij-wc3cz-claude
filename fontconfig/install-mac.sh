@@ -4,7 +4,7 @@
 #   fontconfig/install-mac.sh               install / update (idempotent)
 #   fontconfig/install-mac.sh --uninstall   remove it again
 #   fontconfig/install-mac.sh --check       show whether the font is installed and registered, change nothing
-# Writes exactly two files, owned by this package: ~/Library/Fonts/wc3-icons-mac.ttf and wc3-icons-mac-wide.ttf (copies of
+# Writes exactly two files, owned by this package: ~/Library/Fonts/wc3-icons-mac.ttf and wc3-icons-mac-ghostty.ttf (copies of
 # assets/wc3-icons/wc3-icons-mac*.ttf; a foreign file of those names is never overwritten), and removes the plugin's
 # cached font flag (<state root>/font) so the bar re-checks at the next hook event. It edits no terminal config:
 # the terminal needs one line (printed below), then restart it completely.
@@ -14,11 +14,11 @@ set -u
 here=$(cd "$(dirname "$0")" && pwd -P)
 src="$here/../assets/wc3-icons/wc3-icons-mac.ttf"
 family="WC3 Icons Mac"
-wide_src="$here/../assets/wc3-icons/wc3-icons-mac-wide.ttf"
+wide_src="$here/../assets/wc3-icons/wc3-icons-mac-ghostty.ttf"
 wide_family="WC3 Icons Wide"
 font_dir="$HOME/Library/Fonts"
 dst="$font_dir/wc3-icons-mac.ttf"
-wide_dst="$font_dir/wc3-icons-mac-wide.ttf"
+wide_dst="$font_dir/wc3-icons-mac-ghostty.ttf"
 say() { printf '  wc3-icons: %s\n' "$*"; }
 mode=install
 case "${1:-}" in
@@ -68,6 +68,7 @@ case "$mode" in
   check) check; exit 0 ;;
   uninstall)
     changed=0
+    [ -f "$font_dir/wc3-icons-mac-wide.ttf" ] && ours "$font_dir/wc3-icons-mac-wide.ttf" "$wide_family" && rm -f "$font_dir/wc3-icons-mac-wide.ttf" && changed=1 && say "removed the old wc3-icons-mac-wide.ttf"
     for pair in "$dst|$family" "$wide_dst|$wide_family"; do
       f=${pair%%|*}; fam=${pair#*|}
       [ -f "$f" ] || continue
@@ -82,6 +83,8 @@ esac
 mkdir -p "$font_dir" || { say "could not create $font_dir"; exit 1; }
 changed=0
 tmp=
+# an earlier version installed the ghostty font as wc3-icons-mac-wide.ttf (same family): drop it, two files must not share a family
+[ -f "$font_dir/wc3-icons-mac-wide.ttf" ] && ours "$font_dir/wc3-icons-mac-wide.ttf" "$wide_family" && rm -f "$font_dir/wc3-icons-mac-wide.ttf" && say "removed the old wc3-icons-mac-wide.ttf"
 trap 'rm -f "$tmp"' EXIT
 for pair in "$src|$dst|$family" "$wide_src|$wide_dst|$wide_family"; do
   s_=${pair%%|*}; rest=${pair#*|}; d_=${rest%%|*}; fam=${rest#*|}

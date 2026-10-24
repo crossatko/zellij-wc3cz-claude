@@ -122,12 +122,12 @@ sh ${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/marketplaces/zellij-wc3cz/fontconfig/
 ```
 
 On macOS the same command installs two files, `~/Library/Fonts/wc3-icons-mac.ttf` (an Apple `sbix` build, family
-`WC3 Icons Mac`, for kitty) and `wc3-icons-mac-wide.ttf` (family `WC3 Icons Wide`, for ghostty), drops the cached font flag and prints the line your terminal needs (kitty:
+`WC3 Icons Mac`, for kitty) and `wc3-icons-mac-ghostty.ttf` (family `WC3 Icons Wide`, for ghostty), drops the cached font flag and prints the line your terminal needs (kitty:
 `symbol_map U+1FA70-U+1FAD6,U+1F7E0-U+1F7E6 WC3 Icons Mac`; ghostty: `font-codepoint-map`); it edits no terminal
 config. Quit and reopen the terminal afterwards.
 
 It writes three files that belong to this package (`~/.local/share/fonts/wc3-icons.ttf`,
-`~/.local/share/fonts/wc3-icons-wide.ttf` and `~/.config/fontconfig/conf.d/60-wc3-icons.conf` (macOS: only the two files `~/Library/Fonts/wc3-icons-mac.ttf`, `wc3-icons-mac-wide.ttf`), creating
+`~/.local/share/fonts/wc3-icons-wide.ttf` and `~/.config/fontconfig/conf.d/60-wc3-icons.conf` (macOS: only the two files `~/Library/Fonts/wc3-icons-mac.ttf`, `wc3-icons-mac-ghostty.ttf`), creating
 `~/.config/fontconfig/conf.d/` if missing),
 runs `fc-cache` and drops the plugin's cached font flag; it edits no terminal config. Then close ALL
 windows of your terminal and start it again (a running kitty keeps its font set). If you installed the
@@ -154,7 +154,7 @@ bitmaps; details in `assets/wc3-icons/README.md`):
 | alacritty | a fontconfig rule (alacritty has no fallback setting), e.g. `~/.config/fontconfig/conf.d/61-wc3-icons-alacritty.conf`: `<match target="pattern"><test name="prgname"><string>alacritty</string></test><test name="family"><string>YOUR FONT</string></test><edit name="family" mode="append" binding="same"><string>WC3 Icons Wide</string></edit></match>` inside `<fontconfig>` | alacritty draws the bitmap at font_px/96, not fitted to the cell, bottom anchored at the baseline: Paper Mono 18 with `font.offset.y = 0` (15x29): 30x29, exact. Other line heights overflow into the line above (`offset.y = -2`: 2 px) or leave a gap; build a `WC3 Icons Custom` font for that cell (`assets/wc3-icons/README.md`, e.g. 15x27: 30x27 exact) and name it in the rule. The rule also makes alacritty draw the race icons for the circle emoji U+1F7E0..U+1F7E6. Verified |
 | wezterm, konsole, others | untested | |
 | kitty (macOS) | CoreText draws no CBDT, so a separate sbix font (`WC3 Icons Mac`; the ghostty one below is a second file): `sh fontconfig/install.sh` (installs `~/Library/Fonts/wc3-icons-mac.ttf`) + `kitty.conf`: `symbol_map U+1FA70-U+1FAD6,U+1F7E0-U+1F7E6 WC3 Icons Mac` | Paper Mono 18 + `cell_height 110%` on Retina (22x47 px cells): 44x47 in 44x47, exact; stacked rows seamless. Other fonts/sizes: undistorted, may be smaller/clipped (rebuild recipe in `assets/wc3-icons/README.md`). Verified |
-| ghostty (macOS) | same install; config: `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons Wide` (+ the same line for `U+1F7E0-U+1F7E6`). The macOS sbix font uses the SAME family name as the Linux one, so a shared (dotfiles) config works on both | Paper Mono 18 + `adjust-cell-height = 3` (Retina cells 22.2x46.2 px): icon fills the 2-cell width, 3 px of background above/below, as on Linux. Verified |
+| ghostty (macOS) | same install; config: `font-codepoint-map = U+1FA70-U+1FAD6=WC3 Icons Wide` (+ the same line for `U+1F7E0-U+1F7E6`). The macOS sbix font uses the SAME family name as the Linux one, so a shared (dotfiles) config works on both | Paper Mono 18 + `adjust-cell-height = 0` (Retina cells 22x43 px): 40x43 px, full cell height, 2 px side gaps; `adjust-cell-height = N` adds N px of background above/below. Verified |
 
 A single bitmap cannot fit every cell: kitty and ghostty scale it to the cell, foot and alacritty draw it
 at the font size, so exact fits hold only for the settings named above (other sizes: smaller icon or gaps of

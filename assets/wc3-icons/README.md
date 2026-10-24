@@ -45,7 +45,7 @@ stay with the system emoji font, and a character without an icon glyph then show
   needs) and runs `fc-cache -f` on the font dir. Then restart the terminal. Check: `fontconfig/install.sh --check`.
   `--uninstall` removes the files (and a `WC3 Icons Custom` build saved as `wc3-icons-custom.ttf`).
 - macOS: `fontconfig/install.sh` (or `setup.sh --font`) hands over to `fontconfig/install-mac.sh`, which copies
-  `wc3-icons-mac.ttf` (family `WC3 Icons Mac`, sbix, for kitty) and `wc3-icons-mac-wide.ttf` (family `WC3 Icons Wide`, the
+  `wc3-icons-mac.ttf` (family `WC3 Icons Mac`, sbix, for kitty) and `wc3-icons-mac-ghostty.ttf` (family `WC3 Icons Wide`, the
   same name as the Linux wide font, for ghostty) to `~/Library/Fonts/` (a foreign file of that name is never
   overwritten; `--uninstall`, `--check`) and prints the terminal line (kitty `symbol_map`, ghostty
   `font-codepoint-map`); restart the terminal completely. The plugin's `race_font auto` is on when that file
@@ -169,22 +169,35 @@ name showed the fallback "?" boxes until the name changed).
 
 ### ghostty on macOS
 
-ghostty (1.3.1) fits the bitmap into 2 cells x the font's natural height, like on Linux, so the build is the Linux
-Wide geometry (ASPECT 1.0345, 116 px high) as sbix; kitty's recipe above would leave 4 px side gaps. Differences from
-the kitty build: (1) every glyph needs a real outline in `glyf` (`SBIX_BOX=1`: a box the size of the bitmap, ONE glyph
-object per glyph name: a shared object is compiled once and the other glyphs come out empty); without it ghostty draws
-nothing. (2) kitty shrinks icons that have the box, so the kitty font keeps empty outlines. (3) The family is named
-exactly like the Linux font, because `font-codepoint-map` with a family that does not exist is silently ignored (the
-system emoji show) but the LAST matching map line wins even if its family is missing, so two lines (one per OS)
-cannot share a config; one name can.
+ghostty (1.3.1, read in `src/font/face/coretext.zig` and `SharedGrid.zig`) renders every colour glyph (any font with an
+`sbix` table is "emoji") with the constraint size=cover, centred, 2.5 % side padding: the glyph's bounding rect (from
+the font OUTLINE, `CTFontGetBoundingRectsForGlyphs`; a glyph without outline has a 0-size rect and draws NOTHING) is
+scaled uniformly into 2 cells x the primary font's natural line height (`face_height`, NOT the cell height:
+`adjust-cell-height` only adds space around it), centred, then CoreText draws the bitmap into that canvas and
+anything outside the canvas is cropped. So:
+
+1. every glyph needs an outline = a box the size of the bitmap (`SBIX_BOX=1`; ONE glyph object per glyph name: a shared
+   object is compiled once and the others come out empty). kitty shrinks icons that have the box, so the kitty font has
+   none.
+2. CoreText does NOT scale `originOffsetY` with the font size (measured with `CTFontDrawGlyphs` at 36 px, strike
+   72: offset -22 strike px moved the bitmap 22 px, the outline rect only 11), so any offset puts bitmap and outline
+   rect out of register and the canvas crops the bottom (first try: 32 of 43 px, face cut off at the mouth).
+   Use offset 0: `BY=S`, the bitmap then sits on the baseline exactly where its outline is.
+3. Bitmap natural size = W x font_px/PPEM, outline = same in units (`W*1000/PPEM`), so they agree at every size.
+4. The aspect decides the shape: at `adjust-cell-height = 0` (Paper Mono 18, Retina: 22 x 43 px cells) the normal
+   portrait ASPECT 0.9362 fills the full height, 40 x 43 px, undistorted, 2 px gaps left and right; the Wide
+   aspect 1.0345 gives 41 x 40 (width-limited). `adjust-cell-height = N` leaves N px above/below either way.
+5. The family is named exactly like the Linux font ("WC3 Icons Wide"), because `font-codepoint-map` with a family
+   that does not exist is silently ignored (system emoji show) but the LAST matching map line wins even if its family
+   is missing, so two lines (one per OS) cannot share a config; one name can.
 
 ```sh
-FAMILY="WC3 Icons Wide" SBIX=1 SBIX_BOX=1 PPEM=72 BY=93 ASPECT=1.0345 python3 build.py wc3-icons-mac-wide.ttf 1222 4 116
+FAMILY="WC3 Icons Wide" SBIX=1 SBIX_BOX=1 PPEM=72 BY=94 ASPECT=0.9362 python3 build.py wc3-icons-mac-ghostty.ttf 1222 4 94
 ```
 
-Measured (isolated ghostty, Paper Mono 18, `adjust-cell-height = 3`, Retina cells 22.2 x 46.2 px): icon fills the
-2-cell width, rows at a 46 px pitch with the 3 px band, whole faces, no clipping. PPEM/BY barely matter (ghostty fits).
-Map the race range U+1F7E0-U+1F7E6 too, or the colour circle emoji show for characters without an icon.
+Verified by screenshot of an isolated ghostty (Paper Mono 18, `adjust-cell-height = 0`): no background row between
+stacked icons, whole faces. Map the race range U+1F7E0-U+1F7E6 too, or the colour circle emoji show for characters
+without an icon.
 
 ## Swap an icon
 

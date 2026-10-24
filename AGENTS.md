@@ -456,12 +456,16 @@ written blind.
   fallback "?" boxes, use a new name while tuning; (4) kitty clips glyphs to the cell, so BY must be exact.
   ghostty (1.3.1, macOS, verified by screenshots of an isolated instance launched as the binary with
   `--config-default-files=false --config-file=...`; `open -g -n -a Ghostty` showed no window): second font
-  `wc3-icons-mac-wide.ttf`, family `WC3 Icons Wide` (same as Linux, so the user's shared dotfiles ghostty config works
-  on both OSes), Wide geometry (ASPECT 1.0345), built with `SBIX_BOX=1` (ghostty draws nothing for glyphs without an
-  outline; a glyph object shared between names compiles once and leaves the others empty; kitty shrinks icons that
-  have the box, so the kitty font has none). A `font-codepoint-map` to a missing family is ignored (system emoji),
-  but the last matching line wins even if missing: per-OS lines cannot share one config. The race range
-  U+1F7E0-U+1F7E6 must be mapped too. install-mac.sh installs both files.
+  `wc3-icons-mac-ghostty.ttf`, family `WC3 Icons Wide` (same as Linux, so the shared dotfiles ghostty config works on
+  both OSes), built `SBIX=1 SBIX_BOX=1 PPEM=72 BY=94 ASPECT=0.9362` (recipe + source reading in
+  `assets/wc3-icons/README.md`, "ghostty on macOS"). Root cause of the earlier bands/crop: ghostty fits the OUTLINE
+  rect into 2 cells x face_height (not the cell height) and crops the CoreText-drawn bitmap to that canvas;
+  CoreText does not scale `originOffsetY` with the font size, so an offset desynchronised bitmap and outline (BY must
+  equal S). Result at `adjust-cell-height = 0`: 40x43 px full cell height. A glyph without outline draws nothing;
+  a glyph object shared between names compiles once (others empty); kitty shrinks icons that have the box (kitty
+  font has none). A `font-codepoint-map` to a missing family is ignored (system emoji), but the last matching line
+  wins even if missing: per-OS lines cannot share one config. Map U+1F7E0-U+1F7E6 too. install-mac.sh installs both
+  files and removes the earlier name `wc3-icons-mac-wide.ttf`.
   NOT verified: real zellij bar in ghostty, other font sizes, non-Retina, `/Library/Fonts`.
   The hook flag on Darwin was checked with a scratch TMPDIR (1 with the font installed).
 
