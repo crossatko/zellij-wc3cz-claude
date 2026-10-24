@@ -90,6 +90,11 @@ if os.environ.get("SBIX"):  # Apple sbix colour bitmap (macOS CoreText); same gl
     fam=os.environ.get("FAMILY","WC3 Icons"); nm=font["name"]  # CoreText wants full + PostScript names too
     for nid,val in ((3,fam+" sbix"),(4,fam+" Regular"),(5,"Version 1.0"),(6,fam.replace(" ","")+"-Regular")):
         for pl,en,lg in ((3,1,0x409),(1,0,0)): nm.setName(val,nid,pl,en,lg)
+    if os.environ.get("SBIX_BOX"):  # outline = box of the bitmap: ghostty draws nothing for a glyph without outline; kitty then shrinks the icon, so only for the ghostty (Wide) build
+        k=UPM/ppem; x0,x1,y0,y1=round(BX*k),round((BX+W)*k),round((bearingY-S)*k),round(bearingY*k)
+        for n in names[1:]:  # one glyph object per name (a shared object is compiled once, the others come out empty)
+            pen=TTGlyphPen(None); pen.moveTo((x0,y0)); pen.lineTo((x0,y1)); pen.lineTo((x1,y1)); pen.lineTo((x1,y0)); pen.closePath()
+            font["glyf"][n]=pen.glyph()
     sb=newTable("sbix"); sb.version=1; sb.flags=1; sb.strikes={}
     stk=SbixStrike(ppem=ppem,resolution=72); stk.glyphs={}
     for gname,png in bitmaps.items():

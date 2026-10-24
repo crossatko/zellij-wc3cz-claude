@@ -454,7 +454,15 @@ written blind.
   (1) the font needs name IDs 3/4/5/6, else CoreText family lookups fail; (2) a per-glyph box outline in `glyf`
   broke the family; (3) CoreText caches by family/file: a rebuilt font under an old family+file name showed
   fallback "?" boxes, use a new name while tuning; (4) kitty clips glyphs to the cell, so BY must be exact.
-  NOT verified: real zellij bar on mac, other font sizes, non-Retina, ghostty/others, `/Library/Fonts`.
+  ghostty (1.3.1, macOS, verified by screenshots of an isolated instance launched as the binary with
+  `--config-default-files=false --config-file=...`; `open -g -n -a Ghostty` showed no window): second font
+  `wc3-icons-mac-wide.ttf`, family `WC3 Icons Wide` (same as Linux, so the user's shared dotfiles ghostty config works
+  on both OSes), Wide geometry (ASPECT 1.0345), built with `SBIX_BOX=1` (ghostty draws nothing for glyphs without an
+  outline; a glyph object shared between names compiles once and leaves the others empty; kitty shrinks icons that
+  have the box, so the kitty font has none). A `font-codepoint-map` to a missing family is ignored (system emoji),
+  but the last matching line wins even if missing: per-OS lines cannot share one config. The race range
+  U+1F7E0-U+1F7E6 must be mapped too. install-mac.sh installs both files.
+  NOT verified: real zellij bar in ghostty, other font sizes, non-Retina, `/Library/Fonts`.
   The hook flag on Darwin was checked with a scratch TMPDIR (1 with the font installed).
 
 ## Known issues / caveats
