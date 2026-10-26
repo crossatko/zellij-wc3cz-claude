@@ -12,7 +12,19 @@ their own voice lines from the Czech dub.
 
 (The tab bar plugin that makes this possible is called `claude-tabs`.)
 
-## Install (two steps)
+## Install
+
+### Easiest: let your Claude Code agent do it
+
+Installing involves a few choices (Linux or macOS, your terminal, the icon font), so the simplest way is to hand
+it to your agent. Paste this into Claude Code:
+
+> Hey, please clone this zellij plugin for Claude from https://github.com/crossatko/zellij-wc3cz-claude, read
+> PROMPT.md and install it for me following the instructions there.
+
+It will check your setup, ask before touching any config, and tell you what it changed.
+
+### Or by hand (two steps)
 
 You need zellij 0.45.x and Claude Code.
 

@@ -54,6 +54,9 @@ character name next to the clock. Linux verified; macOS install and icons verifi
   nothing else references `~/.claude`.
 
 ## Install / packaging (policy: change NO user config by default)
+- `PROMPT.md` (repo root) is the agent install guide (README's recommended route: the user pastes a prompt, their
+  Claude Code agent clones the repo and follows it). Keep it in sync whenever install steps, flags, paths,
+  terminal config lines or options change (also README Quick start and `docs/REFERENCE.md`).
 - Route: Claude Code plugin for the hooks + a zellij layout for the bar; everything else optional.
   `setup.sh` without options = status/dry run, writes nothing. Opt-in: `--font`/`--font-uninstall`,
   `--permissions`, `--build`, `--migrate-to-plugin`, `--link` (legacy alias path), `--legacy-settings-hooks`

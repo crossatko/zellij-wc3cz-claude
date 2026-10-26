@@ -55,6 +55,8 @@ All scripts find each other relative to their own location, so the checkout can 
 
 ## Quick start (no config edits)
 
+An agent can do all of this for you: see `PROMPT.md` (the README has the prompt to paste). The manual steps follow.
+
 None of the package's own scripts edits your zellij, terminal or Claude config files (the `claude` CLI
 itself adds `extraKnownMarketplaces` and `enabledPlugins` to the config dir's `settings.json` when you run
 the two commands below). Two steps. In the paths below, `${CLAUDE_CONFIG_DIR:-~/.claude}` is your Claude
