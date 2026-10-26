@@ -98,7 +98,7 @@ check() {
 terminal_notes() {
   cat <<'EOF'
   Terminals (nothing below is changed by this script; copy the lines yourself, then fully restart the terminal).
-  Measured on Linux with kitty 0.49.2, ghostty 1.3.1, alacritty 0.17.0, foot 1.28.0 (README.md, Terminals):
+  Measured on Linux with kitty 0.49.2, ghostty 1.3.1, alacritty 0.17.0, foot 1.28.0 (docs/REFERENCE.md, Terminals):
   - kitty: fontconfig alone is not enough (it prefers Noto Color Emoji). kitty.conf (pixel exact at 14x36 cells,
     e.g. font_size 18 + modify_font cell_height 110%):
       symbol_map U+1FA70-U+1FAD6 WC3 Icons

@@ -200,7 +200,7 @@ if [ "$do_perm" = 1 ]; then
 fi
 
 [ "$do_hooks" = 1 ] || [ "$do_migrate" = 1 ] || exit $rc
-command -v jq >/dev/null 2>&1 || { echo "  claude-tabs: jq not found, edit the settings file(s) by hand (see README.md)" >&2; exit 1; }
+command -v jq >/dev/null 2>&1 || { echo "  claude-tabs: jq not found, edit the settings file(s) by hand (see docs/REFERENCE.md)" >&2; exit 1; }
 hook="$here/claude-hook.sh"
 case "$hook" in *' '*) hook="\"$hook\"" ;; esac
 

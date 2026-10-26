@@ -1,6 +1,6 @@
 # claude-tabs (zellij-wc3cz-claude): notes for agents
 
-Current state of this package plus short caveats, for whoever works on it next. User-facing docs: `README.md`.
+Current state of this package plus short caveats, for whoever works on it next. User-facing docs: `README.md` (short) and `docs/REFERENCE.md` (full).
 Keep entries short and factual, update in place, no histories, no secrets, no personal setup details
 (hostnames, home paths, session names, monitors). Commit small logical commits and push; no AI attribution.
 
