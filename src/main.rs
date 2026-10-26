@@ -537,7 +537,7 @@ fn truthy(v: Option<&String>, default: bool) -> bool {
 }
 
 // Name for the clock display: drops every `( ... )` group (nested, unbalanced and full-width parens
-// handled), collapses whitespace; falls back to the original when nothing is left.
+// handled) and a trailing all-digit word, collapses whitespace; falls back to the original when nothing is left.
 fn strip_parens(name: &str) -> String {
     let mut depth = 0usize;
     let mut kept = String::new();
@@ -549,7 +549,12 @@ fn strip_parens(name: &str) -> String {
             _ => {}
         }
     }
-    let out = kept.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut words: Vec<&str> = kept.split_whitespace().collect();
+    // a trailing all-digit token ("Rytíř 2") is dropped too, unless it is all that is left
+    if words.len() > 1 && words.last().map_or(false, |w| w.chars().all(|c| c.is_ascii_digit())) {
+        words.pop();
+    }
+    let out = words.join(" ");
     if out.is_empty() { name.to_string() } else { out }
 }
 
@@ -2344,7 +2349,7 @@ mod tests {
 
     #[test]
     fn strip_parens_cases() {
-        assert_eq!(strip_parens("Rytíř 2 (knight rider on horse)"), "Rytíř 2");
+        assert_eq!(strip_parens("Rytíř 2 (knight rider on horse)"), "Rytíř");
         assert_eq!(strip_parens("Arthas (Nemrtví)"), "Arthas");
         assert_eq!(strip_parens("Sylvanas Windrunner (Nemrtví)"), "Sylvanas Windrunner");
         assert_eq!(strip_parens("Plain Name"), "Plain Name");
@@ -2353,6 +2358,10 @@ mod tests {
         assert_eq!(strip_parens("A x) B"), "A x B");
         assert_eq!(strip_parens("A （x） B"), "A B");
         assert_eq!(strip_parens("(only)"), "(only)");
+        assert_eq!(strip_parens("Rytíř 2"), "Rytíř");
+        assert_eq!(strip_parens("Peon2"), "Peon2");
+        assert_eq!(strip_parens("2"), "2");
+        assert_eq!(strip_parens("Unit 2 x"), "Unit 2 x");
     }
 
     #[test]
