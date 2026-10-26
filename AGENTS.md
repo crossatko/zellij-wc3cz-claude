@@ -296,7 +296,7 @@ character name next to the clock. Linux verified; macOS install and icons verifi
   `race_icons` the tab background from `tint_colors(char_style accent, active=true)`, else
   `ribbon_selected.background`; dimmed sessions: plain clock colours, italic. Contrast against the bar
   background is not enforced. `State::clock_char_text` (main.rs) -> `line::tab_line(.., clock_char)` ->
-  `RightSideElementsBuilder::build` (line.rs). Name is cut to the free cells with an ellipsis
+  `RightSideElementsBuilder::build` (line.rs). Parenthesized text is stripped from the name (`strip_parens`, clock only). Name is cut to the free cells with an ellipsis
   (`truncate_cells`, display-cell width) and dropped when fewer than 4 cells remain; it never pushes the
   clock out. NOT verified visually (needs a tab with an assigned character). If the name lags after closing
   a tab by more than ~2 s, suspect zellij's own event ordering.

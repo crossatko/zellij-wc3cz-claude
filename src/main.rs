@@ -536,6 +536,23 @@ fn truthy(v: Option<&String>, default: bool) -> bool {
     }
 }
 
+// Name for the clock display: drops every `( ... )` group (nested, unbalanced and full-width parens
+// handled), collapses whitespace; falls back to the original when nothing is left.
+fn strip_parens(name: &str) -> String {
+    let mut depth = 0usize;
+    let mut kept = String::new();
+    for c in name.chars() {
+        match c {
+            '(' | '（' => depth += 1,
+            ')' | '）' => depth = depth.saturating_sub(1),
+            _ if depth == 0 => kept.push(c),
+            _ => {}
+        }
+    }
+    let out = kept.split_whitespace().collect::<Vec<_>>().join(" ");
+    if out.is_empty() { name.to_string() } else { out }
+}
+
 impl State {
     fn read_files(&mut self) {
         self.files.clear();
@@ -1964,7 +1981,7 @@ impl State {
         let name = self.tab_chars.get(&t.tab_id)?;
         // same accent the tab itself is tinted with (tab.rs tint_colors turns it into the active look)
         let accent = if self.race_tab_colors && self.race_icons { Some(self.char_style(name, false, false).1) } else { None };
-        Some((name.clone(), accent))
+        Some((strip_parens(name), accent))
     }
 
     fn clock_text(&self) -> Option<String> {
@@ -2324,6 +2341,19 @@ fn find_ssh_hosts(table: &str, roots: &[(usize, i32)]) -> HashMap<usize, String>
 mod tests {
     use super::*;
     use unicode_width::UnicodeWidthStr;
+
+    #[test]
+    fn strip_parens_cases() {
+        assert_eq!(strip_parens("Rytíř 2 (knight rider on horse)"), "Rytíř 2");
+        assert_eq!(strip_parens("Arthas (Nemrtví)"), "Arthas");
+        assert_eq!(strip_parens("Sylvanas Windrunner (Nemrtví)"), "Sylvanas Windrunner");
+        assert_eq!(strip_parens("Plain Name"), "Plain Name");
+        assert_eq!(strip_parens("A (x (y)) B"), "A B");
+        assert_eq!(strip_parens("A (x"), "A");
+        assert_eq!(strip_parens("A x) B"), "A x B");
+        assert_eq!(strip_parens("A （x） B"), "A B");
+        assert_eq!(strip_parens("(only)"), "(only)");
+    }
 
     #[test]
     fn ssh_hosts_from_argv() {

@@ -314,7 +314,7 @@ strings or bare true/false (`true/1/yes/on`, `false/0/no/off`); they are read wh
 | `title_fallback` | `true` | detect Claude panes by command/title when there is no hook state |
 | `tab_numbers` | `false` | prefix tab labels with their number |
 | `clock` | `true` | `HH:MM` on the right |
-| `clock_character` | `true` | name of the active tab's character left of the clock (needs `clock`; truncated, then dropped, when space is short) |
+| `clock_character` | `true` | name of the active tab's character (without any `(...)` suffix) left of the clock (needs `clock`; truncated, then dropped, when space is short) |
 | `show_other_clients` | `false` | stock `[ ]` markers of other attached clients |
 | `active_underline` | `false` | underline the active tab |
 | `subagent_count` | `true` | number of running subagents after `✻` |
