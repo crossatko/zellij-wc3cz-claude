@@ -1,10 +1,14 @@
-# claude-tabs 🧙
+# Warcraft III in your terminal ⚔️
 
-A friendly tab bar for [zellij](https://zellij.dev) that knows when your Claude Code agents are busy.
+Every Claude Code agent you run in [zellij](https://zellij.dev) becomes a Warcraft III hero or unit, and when it
+finishes its job it tells you, in Czech: Arthas, Thrall, Illidan, Jaina, a grumpy Peon and ~90 more, each with
+their own voice lines from the Czech dub.
 
-- A spinning `✻` shows which tabs run Claude, with a counter for subagents.
-- Every Claude tab gets its own Warcraft III character (portrait icon and tab colour).
-- When an agent finishes, that character says a random Czech line out loud. Tabs you haven't looked at yet blink.
+- Each Claude tab gets its own character: portrait icon and a tab colour matching its race.
+- When the agent is done, that character says a random line out loud, and tabs you haven't looked at yet blink.
+- A spinning `✻` shows which tabs are busy, with a counter for subagents.
+
+(The tab bar plugin that makes this possible is called `claude-tabs`.)
 
 ## Install (two steps)
 
