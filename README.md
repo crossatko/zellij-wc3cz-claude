@@ -4,6 +4,8 @@ Every Claude Code agent you run in [zellij](https://zellij.dev) becomes a Warcra
 finishes its job it tells you, in Czech: Arthas, Thrall, Illidan, Jaina, a grumpy Peon and ~90 more, each with
 their own voice lines from the Czech dub.
 
+**Czech only:** all voice lines are in Czech, there is no English version.
+
 - Each Claude tab gets its own character: portrait icon and a tab colour matching its race.
 - When the agent is done, that character says a random line out loud, and tabs you haven't looked at yet blink.
 - A spinning `✻` shows which tabs are busy, with a counter for subagents.
