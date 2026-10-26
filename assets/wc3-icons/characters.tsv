@@ -64,7 +64,7 @@ orc	Jezdec	U+1FAB3	7	icons/chars/BTNRaider.webp	unit	-	rider
 orc	Jezdec na wyverně	U+1FAB4	9	icons/chars/BTNWyvernRider.webp	unit	-	rider
 orc	Náčelník taurů	U+1FAB5	8	icons/chars/BTNHeroTaurenChieftain.webp	hero	m	orcish
 orc	Peon	U+1FAB6	7	icons/chars/BTNPeon.webp	unit	-	-
-orc	Prorok	U+1FAB7	9	icons/chars/BTNHeroFarseer.webp	hero	m	shaman
+orc	Prorok	U+1FAB7	9	icons/chars/BTNMedivh.webp	hero	m	arcane
 orc	Pán mečů	U+1FAB8	7	icons/chars/BTNHeroBlademaster.webp	hero	m	orcish
 orc	Přízračný chodec	U+1FAB9	10	icons/chars/BTNSpiritWalker.webp	unit	-	shaman
 orc	Rexxar	U+1FABA	12	icons/chars/BTNRexxar.webp	hero	m	orcish
